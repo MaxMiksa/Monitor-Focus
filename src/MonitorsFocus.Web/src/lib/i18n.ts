@@ -13,7 +13,7 @@ export function createTranslator(language: Language, system = navigator.language
     const template = resolveLanguage(language, system) === 'en' ? strings[key] : key
     return template.replace(/\{(\d+)\}/g, (_, index: string) => String(args[Number(index)] ?? ''))
   }
-  const errorTemplates: TextKey[] = ['连接失败：{0}', '原配置未覆盖：{0}', '检测失败：{0}', '显示器恢复失败：{0}', '恢复失败：{0}', 'WMI 亮度调节失败：{0}', '时间计划未应用：{0}']
+  const errorTemplates: TextKey[] = ['连接失败：{0}', '原配置未覆盖：{0}', '检测失败：{0}', '显示器恢复失败：{0}', '恢复失败：{0}', 'WMI 亮度调节失败：{0}', '时间计划未应用：{0}', '音量调节失败：{0}', '亮度调节失败：{0}', '边缘滚轮监听失败：{0}']
   const reverse = new Map(Object.entries(strings).map(([key, value]) => [value, key as TextKey]))
   function message(value: string): string {
     if (Object.hasOwn(strings, value)) return text(value as TextKey)

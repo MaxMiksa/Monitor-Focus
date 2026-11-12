@@ -9,7 +9,43 @@ using MonitorsFocus.Settings;
 System.Windows.Forms.Application.SetHighDpiMode(System.Windows.Forms.HighDpiMode.PerMonitorV2);
 
 if (args.Contains("--window-fixture")) { WindowDetectionChecks.RunFixture(); return; }
+if (args.Contains("--app-audio-check")) { ApplicationAudioChecks.Run(); return; }
+if (args.Contains("--edge-feedback-check"))
+{
+    var index = Array.IndexOf(args, "--edge-feedback-check");
+    EdgeFeedbackChecks.Run(args.Length > index + 1 ? args[index + 1] : null);
+    return;
+}
 if (args.Contains("--gamma-probe")) { GammaProbe.Run(args); return; }
+if (args.Contains("--volume-probe"))
+{
+    Console.WriteLine($"Default playback volume: {SystemVolume.ProbeLevel():P0} (read only).");
+    return;
+}
+if (args.Contains("--osd-probe"))
+{
+    var kind = args.Last() switch
+    {
+        "volume" => HardwareOsd.Volume,
+        "brightness" => HardwareOsd.Brightness,
+        _ => throw new ArgumentException("Use --osd-probe volume|brightness")
+    };
+    var errors = new ConcurrentQueue<string>();
+    await using var osd = new NativeHardwareOsd(errors.Enqueue);
+    osd.SetEnabled(true, true);
+    osd.Request(kind);
+    await Task.Delay(750);
+    if (errors.TryDequeue(out var error)) throw new Exception(error);
+    Console.WriteLine($"Requested native {kind} indicator; no hardware values changed.");
+    return;
+}
+if (args.Contains("--app-volume-probe"))
+{
+    var target = ForegroundAudioTarget.Capture() ?? throw new InvalidOperationException("No foreground window.");
+    var count = await Task.Run(() => ApplicationVolume.Adjust(target, 0, static () => false));
+    Console.WriteLine($"Foreground PID={target.ProcessId}; controllable application audio sessions={count} (read only).");
+    return;
+}
 
 if (args.Contains("--probe"))
 {
@@ -44,6 +80,14 @@ if (args.Contains("--probe"))
 
 var tests = new (string Name, Func<Task> Run)[]
 {
+    ("Edge wheel handles physical edges, negative origins, independent toggles and fractional detents", EdgeWheelChecks.GesturesAsync),
+    ("Edge wheel settings default off, persist independently and survive scene changes", EdgeWheelChecks.SettingsAsync),
+    ("Native edge hook installs on a dedicated thread and unhooks when disabled", EdgeWheelChecks.HookLifecycleAsync),
+    ("Native OSD coalesces bursts, drops disabled requests and isolates shell failures", EdgeWheelChecks.OsdQueueAsync),
+    ("Configurable edge modifiers isolate gestures, application process trees and volume limits", EdgeWheelChecks.AlternateAsync),
+    ("Edge preview moves before confirmation, rebases pending input and stays bounded", EdgeWheelChecks.PreviewAsync),
+    ("Ctrl edge temperature respects color support, linking, manual holds and limits", ControlCenterChecks.EdgeTemperatureAsync),
+    ("Edge brightness uses manual holds, ratio linking, limits and saved switches", ControlCenterChecks.EdgeBrightnessAsync),
     ("Brightness calibration matches all measured points, inverse mapping and saturation", BrightnessLinkChecks.CurveAsync),
     ("Brightness calibration rejects invalid identities and nonmonotonic or incomplete curves", BrightnessLinkChecks.ValidationAsync),
     ("Calibrated linking works at all temperatures, both sliders, zero, offline, scenes and schedules", ControlCenterChecks.CalibratedBindingAsync),

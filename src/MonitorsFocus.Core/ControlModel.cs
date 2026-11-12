@@ -21,6 +21,9 @@ public sealed class ControlSettings
     public int FocusDelaySeconds { get; set; } = 180;
     public bool ScheduleEnabled { get; set; }
     public bool LaunchOnStartup { get; set; }
+    public bool TopEdgeBrightnessEnabled { get; set; }
+    public bool BottomEdgeVolumeEnabled { get; set; }
+    public string EdgeWheelModifier { get; set; } = "alt";
     public List<Scene> Scenes { get; set; } = new();
     public List<PlanPoint> Schedule { get; set; } = new();
 }
@@ -132,6 +135,7 @@ public static class DailyPlan
     {
         if (settings.SchemaVersion != 1) throw new ArgumentException("配置版本不受支持。");
         if (settings.Language is not ("system" or "zh-CN" or "en")) throw new ArgumentException("不支持的语言设置。");
+        if (settings.EdgeWheelModifier is not ("alt" or "ctrl" or "shift")) throw new ArgumentException("不支持的边缘滚轮按键。");
         if (settings.FocusDelaySeconds is < 0 or > 600)
             throw new ArgumentException("专注参数超出范围。");
         ValidateBinding(settings.Linked, settings.LinkWeights);

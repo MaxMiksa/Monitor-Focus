@@ -22,6 +22,67 @@ internal static class ControlCenterChecks
         Schedule = [new(8 * 60, "day", 0), new(20 * 60, "night", 60)]
     };
 
+    public static async Task EdgeBrightnessAsync()
+    {
+        var settings = Settings();
+        settings.TopEdgeBrightnessEnabled = true;
+        await using var app = new Fixture(settings, new(2026, 11, 1, 19, 0, 0));
+        app.Tick();
+        app.EdgeBrightness("a", 1);
+        app.Tick();
+        Equal(92, app.Snapshot().Displays[0].Brightness);
+        Equal(60, app.Snapshot().Displays[1].Brightness);
+        Check(app.Snapshot().Source.StartsWith("Manual"));
+        var saved = app.Snapshot().Settings;
+        saved.Linked = true;
+        saved.LinkWeights = new() { ["a"] = 60, ["b"] = 30 };
+        app.Save(saved);
+        app.EdgeBrightness("a", -1);
+        Equal(90, app.Snapshot().Displays[0].Brightness);
+        Equal(45, app.Snapshot().Displays[1].Brightness);
+        app.EdgeBrightness("b", 100);
+        Equal(100, app.Snapshot().Displays[0].Brightness);
+        Equal(50, app.Snapshot().Displays[1].Brightness);
+        app.EdgeBrightness("b", -100);
+        Equal(0, app.Snapshot().Displays[0].Brightness);
+        Equal(0, app.Snapshot().Displays[1].Brightness);
+        saved = app.Snapshot().Settings;
+        saved.TopEdgeBrightnessEnabled = false;
+        app.Save(saved);
+        app.EdgeBrightness("a", 1);
+        Equal(0, app.Snapshot().Displays[0].Brightness);
+        app.EdgeBrightness("offline", 1);
+        Equal(0, app.Snapshot().Displays[0].Brightness);
+    }
+
+    public static async Task EdgeTemperatureAsync()
+    {
+        var settings = Settings();
+        settings.TopEdgeBrightnessEnabled = true;
+        await using var app = new Fixture(settings, new(2026, 11, 1, 19, 0, 0));
+        app.Tick();
+        app.EdgeTemperature("a", -1);
+        Equal(6400, app.Snapshot().Displays[0].Kelvin);
+        Equal<int?>(null, app.Snapshot().Displays[1].Kelvin);
+        Equal(90, app.Snapshot().Displays[0].Brightness);
+        Check(app.Snapshot().Source.StartsWith("Manual"));
+        var saved = app.Snapshot().Settings;
+        saved.Linked = true;
+        saved.LinkWeights = new() { ["a"] = 90, ["b"] = 60 };
+        app.Save(saved);
+        app.EdgeTemperature("a", -100);
+        Equal(2700, app.Snapshot().Displays[0].Kelvin);
+        Equal(2700, app.Snapshot().Displays[1].Kelvin);
+        app.EdgeTemperature("b", 100);
+        Equal(6500, app.Snapshot().Displays[0].Kelvin);
+        Equal(6500, app.Snapshot().Displays[1].Kelvin);
+        saved = app.Snapshot().Settings;
+        saved.TopEdgeBrightnessEnabled = false;
+        app.Save(saved);
+        app.EdgeTemperature("a", -1);
+        Equal(6500, app.Snapshot().Displays[0].Kelvin);
+    }
+
     public static async Task ManualHandoffAsync()
     {
         await using var app = new Fixture(Settings(), new(2026, 11, 1, 19, 59, 59));
@@ -384,6 +445,8 @@ internal static class ControlCenterChecks
         }
         public ControlSnapshot Snapshot() => (ControlSnapshot)Invoke("Snapshot", new object?[] { null })!;
         public ControlSnapshot Send(ControlRequest request) => (ControlSnapshot)Invoke("Handle", request)!;
+        public void EdgeBrightness(string id, int steps) => Invoke("ApplyEdgeWheel", new EdgeWheelAction(id, steps));
+        public void EdgeTemperature(string id, int steps) => Invoke("ApplyEdgeWheel", new EdgeWheelAction(id, steps, true));
         public void Fullscreen(params string[] ids)
         {
             Set("_fullscreenDisplays", ids.ToHashSet());

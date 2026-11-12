@@ -9,7 +9,7 @@ import { SortableList } from '@/components/sortable-list'
 import { DisplayRow } from '@/App'
 import type { Send } from '@/App'
 import { captureBehavior } from '@/lib/control'
-import type { PlanPoint, Settings, Snapshot } from '@/lib/control'
+import type { EdgeWheelModifier, PlanPoint, Settings, Snapshot } from '@/lib/control'
 
 type SettingsDraft = Omit<Settings, 'Schedule'> & { Schedule: (PlanPoint & { key: string })[] }
 type DraftHistory = { past: SettingsDraft[]; present: SettingsDraft; future: SettingsDraft[] }
@@ -85,6 +85,9 @@ export function SettingsEditor({ page, snapshot, send }: { page: Page; snapshot:
     {page === 'general' && <>
       <div className="form-row"><label htmlFor="language">{t('语言')}</label><select id="language" value={draft.Language ?? 'system'} onChange={e => { const language = e.target.value as Language; change(s => { s.Language = language }); setLanguage(language) }}><option value="system">{t('跟随系统')}</option><option value="zh-CN">简体中文</option><option value="en">English</option></select></div>
       <div className="form-row"><label htmlFor="startup">{t('登录后自动启动')}</label><Switch id="startup" checked={draft.LaunchOnStartup} onCheckedChange={on => change(s => { s.LaunchOnStartup = on })} /></div>
+      <div className="form-row"><label htmlFor="edge-brightness">{t('顶部滚轮调节亮度')}</label><Switch id="edge-brightness" checked={draft.TopEdgeBrightnessEnabled ?? false} onCheckedChange={on => change(s => { s.TopEdgeBrightnessEnabled = on })} /></div>
+      <div className="form-row"><label htmlFor="edge-volume">{t('底部滚轮调节音量')}</label><Switch id="edge-volume" checked={draft.BottomEdgeVolumeEnabled ?? false} onCheckedChange={on => change(s => { s.BottomEdgeVolumeEnabled = on })} /></div>
+      <div className="form-row"><label htmlFor="edge-modifier">{t('色温／应用音量按键')}</label><select id="edge-modifier" value={draft.EdgeWheelModifier ?? 'alt'} onChange={e => change(s => { s.EdgeWheelModifier = e.target.value as EdgeWheelModifier })}><option value="alt">Alt</option><option value="ctrl">Ctrl</option><option value="shift">Shift</option></select></div>
       <Button className="mt-5" variant="outline" onClick={() => void send({ Action: 'rescan' })}><RefreshCw />{t('重新检测显示器')}</Button>
     </>}
     </div>

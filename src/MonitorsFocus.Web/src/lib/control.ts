@@ -6,7 +6,8 @@ export interface Scene { Id: string; Name: string; DefaultName?: string; Targets
 export interface PlanPoint { MinuteOfDay: number; SceneId: string; TransitionMinutes: number }
 export interface TemperatureBrightnessPoint { Kelvin: number; ReferenceBrightness: number; CompensatedBrightness: number }
 export interface BrightnessLinkCalibration { SourceId: string; TargetId: string; Points: { Source: number; Target: number }[] }
-export interface Settings extends SceneBehavior { SchemaVersion: number; Revision: number; Language: Language; KeepSecondaryAwakeOnFullscreen: boolean; FocusDelaySeconds: number; ScheduleEnabled: boolean; LaunchOnStartup: boolean; Scenes: Scene[]; Schedule: PlanPoint[]; TemperatureBrightnessCalibrations?: Record<string, { Points: TemperatureBrightnessPoint[] }>; BrightnessLinkCalibration?: BrightnessLinkCalibration | null }
+export type EdgeWheelModifier = 'alt' | 'ctrl' | 'shift'
+export interface Settings extends SceneBehavior { SchemaVersion: number; Revision: number; Language: Language; KeepSecondaryAwakeOnFullscreen: boolean; FocusDelaySeconds: number; ScheduleEnabled: boolean; LaunchOnStartup: boolean; TopEdgeBrightnessEnabled: boolean; BottomEdgeVolumeEnabled: boolean; EdgeWheelModifier: EdgeWheelModifier; Scenes: Scene[]; Schedule: PlanPoint[]; TemperatureBrightnessCalibrations?: Record<string, { Points: TemperatureBrightnessPoint[] }>; BrightnessLinkCalibration?: BrightnessLinkCalibration | null }
 export interface Snapshot { Displays: Display[]; Settings: Settings; FocusPaused: boolean; Source: string; Error: string | null; Warning?: string | null; SystemLanguage?: string | null }
 export interface Request { Action: string; Id?: string; Value?: number; Settings?: Settings }
 
@@ -44,7 +45,7 @@ export const preview: Snapshot = {
     { Id: 'preview-external', Name: 'AOC U27G4', Brightness: 40, CanAdjust: true, CanAdjustColor: true, Kelvin: 4500, Error: null, IsPrimary: true },
     { Id: 'preview-internal', Name: '笔记本屏幕', Brightness: 60, CanAdjust: true, CanAdjustColor: false, Kelvin: null, Error: null, IsPrimary: false },
   ],
-  Settings: { SchemaVersion: 1, Revision: 0, Language: 'system', Linked: false, LinkWeights: {}, FocusEnabled: false, ControlledDisplayIds: null, KeepSecondaryAwakeOnFullscreen: true, FocusDelaySeconds: 180, ScheduleEnabled: false, LaunchOnStartup: false,
+  Settings: { SchemaVersion: 1, Revision: 0, Language: 'system', Linked: false, LinkWeights: {}, FocusEnabled: false, ControlledDisplayIds: null, KeepSecondaryAwakeOnFullscreen: true, FocusDelaySeconds: 180, ScheduleEnabled: false, LaunchOnStartup: false, TopEdgeBrightnessEnabled: false, BottomEdgeVolumeEnabled: false, EdgeWheelModifier: 'alt',
     Scenes: ['日常', '夜间', '专注'].map((Name, i) => ({ Id: `preview-${i}`, Name, DefaultName: Name, Behavior: { Linked: false, LinkWeights: {}, FocusEnabled: i === 2, ControlledDisplayIds: null }, Targets: { 'preview-external': { Brightness: [40, 20, 30][i], Kelvin: [6500, 3200, 4500][i] }, 'preview-internal': { Brightness: [60, 30, 45][i], Kelvin: null } } })), Schedule: [] },
   FocusPaused: false, Source: '视觉预览 · 未连接硬件', Error: null,
 }

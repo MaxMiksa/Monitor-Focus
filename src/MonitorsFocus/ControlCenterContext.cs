@@ -30,6 +30,7 @@ internal sealed class ControlCenterContext : ApplicationContext
         public (int, int, int?)? LastRequest;
         public long NextColorCheck;
         public Task LastApply = Task.CompletedTask;
+        public Task? FeedbackWait;
     }
 
     private readonly SynchronizationContext _ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
@@ -40,6 +41,22 @@ internal sealed class ControlCenterContext : ApplicationContext
     private readonly Dictionary<string, int?> _retainedKelvin = new();
     private readonly NotifyIcon _tray;
     private readonly Timer _timer = new() { Interval = 50 };
+    private readonly EdgeWheelService? _edgeWheel;
+    private readonly SystemVolume? _volume;
+    private readonly NativeHardwareOsd? _hardwareOsd;
+    private Display? _brightnessFeedback;
+    private (Display Display, int Kelvin, long Version)? _temperatureFeedback;
+    private EdgeFeedbackForm? _edgeFeedback;
+    private long _edgeFeedbackVersion;
+    private ForegroundAudioTarget? _applicationFeedbackTarget;
+    private long _applicationFeedbackSince;
+    private ApplicationVolumePreview? _applicationPreview;
+    private long _applicationInputAt;
+    private sealed record PendingApplicationFeedback(ApplicationVolumeFeedback Value, long Version);
+    private PendingApplicationFeedback? _applicationFeedback;
+    private int _applicationFeedbackPosted;
+    private string? _edgeWheelError;
+    private long _nextEdgeErrorAt;
     private readonly SemaphoreSlim _scanGate = new(1);
     private ControlSettings _settings;
     private bool _paused;
@@ -73,6 +90,11 @@ internal sealed class ControlCenterContext : ApplicationContext
         menu.Items.Add(T("恢复原色"), null, (_, _) => { RestoreColor(); HoldManual(); Tick(); });
         menu.Items.Add(T("退出"), null, (_, _) => ExitThread());
         _tray = new NotifyIcon { Text = "Monitors Focus", Icon = AppIcons.Tray(), Visible = true, ContextMenuStrip = menu };
+        _hardwareOsd = new NativeHardwareOsd(error => ReportEdgeError("系统浮层不可用：{0}", error));
+        _volume = new SystemVolume(error => ReportEdgeError("音量调节失败：{0}", error),
+            () => _hardwareOsd.Request(HardwareOsd.Volume), PostApplicationFeedback);
+        _edgeWheel = new EdgeWheelService(error => ReportEdgeError("边缘滚轮监听失败：{0}", error),
+            () => _ui.Post(_ => Tick(), null));
         menu.Opening += (_, _) =>
         {
             var keys = new[] { "打开控制面板", "暂停 / 恢复专注", "恢复原色", "退出" };
@@ -92,7 +114,7 @@ internal sealed class ControlCenterContext : ApplicationContext
     private void MonitorsChanged(object? sender, EventArgs e) => _ui.Post(_ => { if (!_closing) _ = ScanAsync(); }, null);
     private void ThemeChanged(object sender, UserPreferenceChangedEventArgs e)
     {
-        if (e.Category == UserPreferenceCategory.General) _ui.Post(_ => { if (!_closing) { var old = _tray.Icon; _tray.Icon = AppIcons.Tray(); old?.Dispose(); } }, null);
+        if (e.Category == UserPreferenceCategory.General) _ui.Post(_ => { if (!_closing) { var old = _tray.Icon; _tray.Icon = AppIcons.Tray(); old?.Dispose(); _edgeFeedback?.RefreshAppearance(); } }, null);
     }
     private void PowerChanged(object sender, PowerModeChangedEventArgs e)
     {
@@ -103,6 +125,7 @@ internal sealed class ControlCenterContext : ApplicationContext
     {
         if (_closing) return;
         _scanning = true;
+        RefreshEdgeWheel();
         await _scanGate.WaitAsync();
         try
         {
@@ -160,8 +183,32 @@ internal sealed class ControlCenterContext : ApplicationContext
             _fullscreenDisplays.Clear();
         }
         catch (Exception ex) { _error = $"检测失败：{ex.Message}"; }
-        finally { _scanning = false; _scanGate.Release(); }
+        finally { _scanning = false; RefreshEdgeWheel(); _scanGate.Release(); }
     }
+
+    private void RefreshEdgeWheel()
+    {
+        ClearEdgeFeedback();
+        _hardwareOsd?.SetEnabled(!_closing && !_scanning && _settings.TopEdgeBrightnessEnabled,
+            !_closing && !_scanning && _settings.BottomEdgeVolumeEnabled);
+        if (_closing || _scanning || !_settings.TopEdgeBrightnessEnabled) _brightnessFeedback = null;
+        _volume?.SetEnabled(!_closing && !_scanning && _settings.BottomEdgeVolumeEnabled);
+        _edgeWheel?.Update(!_closing && !_scanning && _settings.TopEdgeBrightnessEnabled,
+            !_closing && !_scanning && _settings.BottomEdgeVolumeEnabled,
+            _scanning || _closing ? [] : _displays.Select(d => new EdgeWheelTarget(d.Id, d.Monitor.Bounds,
+                d.Controller != null, d.Controller?.SupportsColor == true)).ToArray(), _settings.EdgeWheelModifier);
+        _timer.Interval = _settings.FocusEnabled && !_paused ? 50 : 1000;
+    }
+
+    private void ReportEdgeError(string template, string error) => _ui.Post(_ =>
+    {
+        if (_closing) return;
+        _edgeWheelError = Localization.Format(template, _settings.Language, Localization.Message(error, _settings.Language));
+        ClearEdgeFeedback();
+        if (Environment.TickCount64 < _nextEdgeErrorAt) return;
+        _nextEdgeErrorAt = Environment.TickCount64 + 5000;
+        _tray.ShowBalloonTip(3000, "Monitors Focus", _edgeWheelError, ToolTipIcon.Warning);
+    }, null);
 
     private void ApplyBrightness(Display display, int value)
     {
@@ -172,9 +219,81 @@ internal sealed class ControlCenterContext : ApplicationContext
         HoldManual();
     }
 
+    private void ReadEdgeWheel()
+    {
+        while (_edgeWheel?.TryRead(out var action) == true)
+        {
+            if (!PhysicalDisplayScope.IsConsole) continue;
+            ApplyEdgeWheel(action!);
+        }
+    }
+
+    private void ApplyEdgeWheel(EdgeWheelAction action)
+    {
+        var version = ++_edgeFeedbackVersion;
+        if (action is { DisplayId: null, Alternate: true, AudioTarget: { } audio })
+        {
+            if (_applicationFeedbackTarget?.Window != audio.Window || _applicationFeedbackTarget?.ProcessId != audio.ProcessId)
+            {
+                _applicationFeedbackTarget = audio;
+                _applicationFeedbackSince = version;
+                (_applicationPreview ??= new()).Clear();
+            }
+        }
+        else
+        {
+            _applicationFeedbackTarget = null;
+            _applicationPreview?.Clear();
+        }
+        _temperatureFeedback = null;
+        _brightnessFeedback = null;
+        if (!action.Alternate) _edgeFeedback?.Dismiss();
+        if (action.DisplayId == null)
+        {
+            if (action.Alternate && (action.AudioTarget == null || !action.AudioTarget.IsCurrent)) return;
+            if (!_settings.BottomEdgeVolumeEnabled) return;
+            if ((action.Alternate && _applicationPreview?.CanAdd == false) ||
+                _volume?.TryAdjust(action.Steps, action.Alternate ? action.AudioTarget : null, version) != true)
+            {
+                ReportEdgeError("音量调节失败：{0}", T("操作过快，请稍后重试。"));
+                return;
+            }
+            if (action.Alternate)
+            {
+                _applicationPreview!.Add(version, action.Steps);
+                _applicationInputAt = Environment.TickCount64;
+                PresentApplicationPreview();
+            }
+        }
+        else if (_settings.TopEdgeBrightnessEnabled)
+        {
+            var display = _displays.FirstOrDefault(d => d.Id == action.DisplayId && d.Controller != null);
+            if (display == null) return;
+            if (action.Alternate)
+            {
+                _brightnessFeedback = null;
+                if (display.Controller?.SupportsColor != true) return;
+                var kelvin = QuantizeKelvin(Math.Clamp((display.Kelvin ?? 6500) + action.Steps * 100, 2700, 6500));
+                foreach (var d in _displays)
+                    if ((d == display || _settings.Linked) && d.Controller?.SupportsColor == true) d.Kelvin = kelvin;
+                HoldManual();
+                _temperatureFeedback = (display, kelvin!.Value, version);
+                PresentEdgeFeedback(EdgeFeedback.Color(T("色温"), kelvin.Value));
+                return;
+            }
+            try
+            {
+                ApplyBrightness(display, Math.Clamp(display.Brightness + action.Steps * 2, 0, 100));
+                _brightnessFeedback = display;
+            }
+            catch (Exception ex) { ReportEdgeError("亮度调节失败：{0}", ex.Message); }
+        }
+    }
+
     private void Tick()
     {
         if (_closing || _scanning) return;
+        ReadEdgeWheel();
         var now = Environment.TickCount64;
         if (now >= _nextPlanAt)
         {
@@ -239,7 +358,105 @@ internal sealed class ControlCenterContext : ApplicationContext
             d.LastRequest = target;
             if (d.Controller != null) d.LastApply = d.Controller.ApplyAsync(d.Brightness, compensation.Value, d.Kelvin);
         }
+        ShowBrightnessFeedback();
         _timer.Interval = _settings.FocusEnabled && !_paused ? 50 : 1000;
+    }
+
+    private void ShowBrightnessFeedback()
+    {
+        if (_hardwareOsd == null) return;
+        var temperature = _temperatureFeedback;
+        var display = temperature?.Display ?? _brightnessFeedback;
+        if (display == null) return;
+        foreach (var pending in _displays)
+        {
+            // Linked wheel input may also change the internal panel whose value
+            // the native brightness indicator reads.
+            if (pending != display && !(_settings.Linked && (temperature.HasValue || pending.IsInternal))) continue;
+            if (pending.LastApply.IsCompleted) continue;
+            if (pending.FeedbackWait != pending.LastApply)
+            {
+                pending.FeedbackWait = pending.LastApply;
+                _ = WakeAfterBrightnessAsync(pending.LastApply);
+            }
+            return;
+        }
+        _brightnessFeedback = null;
+        _temperatureFeedback = null;
+        if (temperature is { } color)
+        {
+            if (color.Version == _edgeFeedbackVersion && _settings.TopEdgeBrightnessEnabled && _displays.Contains(display))
+            {
+                var failure = _displays.FirstOrDefault(d => (d == display || _settings.Linked) &&
+                    (d.Controller?.Error != null || !d.LastApply.IsCompletedSuccessfully));
+                if (failure != null) ReportEdgeError("色温调节失败：{0}",
+                    failure.Controller?.Error ?? failure.LastApply.Exception?.GetBaseException().Message ?? "色温写入未生效。");
+            }
+            return;
+        }
+        if (_settings.TopEdgeBrightnessEnabled && _displays.Contains(display) &&
+            display.Controller?.Error == null && display.LastApply.IsCompletedSuccessfully && PhysicalDisplayScope.IsConsole)
+            _hardwareOsd.Request(HardwareOsd.Brightness);
+    }
+
+    private void ClearEdgeFeedback()
+    {
+        ++_edgeFeedbackVersion;
+        _applicationFeedbackTarget = null;
+        _applicationPreview?.Clear();
+        _temperatureFeedback = null;
+        Interlocked.Exchange(ref _applicationFeedback, null);
+        _edgeFeedback?.Dismiss();
+    }
+
+    private void PostApplicationFeedback(ApplicationVolumeFeedback feedback, long version)
+    {
+        Interlocked.Exchange(ref _applicationFeedback, new(feedback, version));
+        if (Interlocked.Exchange(ref _applicationFeedbackPosted, 1) == 0)
+            _ui.Post(_ =>
+            {
+                Interlocked.Exchange(ref _applicationFeedbackPosted, 0);
+                var pending = Interlocked.Exchange(ref _applicationFeedback, null);
+                if (pending == null || !MatchesApplicationFeedback(_applicationFeedbackTarget, _applicationFeedbackSince,
+                    pending.Version, pending.Value.Target) || _closing || _scanning ||
+                    !_settings.BottomEdgeVolumeEnabled || !pending.Value.Target.IsCurrent) return;
+                if (_applicationPreview?.Confirm(pending.Value, pending.Version) == true &&
+                    Environment.TickCount64 - _applicationInputAt < 1500)
+                    PresentApplicationPreview();
+            }, null);
+    }
+
+    internal static bool MatchesApplicationFeedback(ForegroundAudioTarget? active, long since, long version, ForegroundAudioTarget feedback) =>
+        active != null && version >= since && active.Window == feedback.Window && active.ProcessId == feedback.ProcessId;
+
+    private void PresentApplicationPreview()
+    {
+        var preview = _applicationPreview!;
+        var remaining = 1500 - (int)Math.Clamp(Environment.TickCount64 - _applicationInputAt, 0, 1500);
+        if (remaining == 0) return;
+        PresentEdgeFeedback(preview.Level is { } level && preview.Value is { } value
+            ? EdgeFeedback.Volume(value.Name, level, value.Muted, T("静音"))
+            : new EdgeFeedback(T("应用音量"), "…", 0, false), remaining);
+    }
+
+    private void PresentEdgeFeedback(EdgeFeedback feedback, int hideAfterMilliseconds = 1500)
+    {
+        if (_edgeWheel == null || _closing || _scanning || !PhysicalDisplayScope.IsConsole) return;
+        var point = Cursor.Position;
+        var area = Screen.FromPoint(point).WorkingArea;
+        var monitor = NativeMethods.MonitorFromPoint(new NativeMethods.POINT { X = point.X, Y = point.Y }, NativeMethods.MONITOR_DEFAULTTONEAREST);
+        var dpi = GetDpiForMonitor(monitor, 0, out var horizontal, out _) == 0 ? (int)horizontal : 96;
+        (_edgeFeedback ??= new EdgeFeedbackForm()).Present(feedback, area, dpi, hideAfterMilliseconds);
+    }
+
+    [System.Runtime.InteropServices.DllImport("shcore.dll")]
+    private static extern int GetDpiForMonitor(IntPtr monitor, int kind, out uint x, out uint y);
+
+    private async Task WakeAfterBrightnessAsync(Task operation)
+    {
+        try { await operation.ConfigureAwait(false); }
+        catch { /* The display worker owns device error reporting. */ }
+        _ui.Post(_ => { if (!_closing) Tick(); }, null);
     }
 
     private void ApplyTargets(Dictionary<string, DisplayTarget> targets)
@@ -389,6 +606,8 @@ internal sealed class ControlCenterContext : ApplicationContext
         var bindingChanged = settings.Linked != _settings.Linked ||
             JsonSerializer.Serialize(settings.BrightnessLinkCalibration) != JsonSerializer.Serialize(_settings.BrightnessLinkCalibration);
         _settings = settings;
+        _edgeWheelError = null;
+        RefreshEdgeWheel();
         if (bindingChanged) ApplyCalibratedLink();
         if (planChanged)
         {
@@ -410,7 +629,7 @@ internal sealed class ControlCenterContext : ApplicationContext
         _scanning ? T("正在检测显示器…") : _sourceScene != null
             ? Localization.Format(_sourceIsPlan ? "时间计划 · {0}" : "场景 · {0}", _settings.Language, Localization.SceneName(_sourceScene, _settings.Language))
             : _manualUntil.HasValue ? Localization.Format("手动 · 保持至 {0}", _settings.Language, _manualUntil.Value.ToString("HH:mm"))
-            : T("手动调节"), Localization.Message(error, _settings.Language), Localization.Message(_planError ?? _error ??
+            : T("手动调节"), Localization.Message(error, _settings.Language), Localization.Message(_planError ?? _error ?? _edgeWheelError ??
                 _displays.Select(d => d.CompensationWarning).FirstOrDefault(w => w != null), _settings.Language), Localization.Resolve("system"));
 
     private async Task ServeAsync()
@@ -464,6 +683,12 @@ internal sealed class ControlCenterContext : ApplicationContext
     {
         if (_closing) return;
         _closing = true;
+        ClearEdgeFeedback();
+        _edgeFeedback?.Dispose();
+        _hardwareOsd?.SetEnabled(false, false);
+        _edgeWheel?.Dispose();
+        if (_volume != null) await _volume.DisposeAsync();
+        if (_hardwareOsd != null) await _hardwareOsd.DisposeAsync();
         _lifetime.Cancel();
         _timer.Dispose();
         SystemEvents.PowerModeChanged -= PowerChanged;

@@ -12,7 +12,8 @@ public static class Localization
     // Only application-owned error wrappers contain dynamic details. Device names and user text
     // are formatted separately, never searched or translated as messages.
     private static readonly string[] ErrorTemplates = { "原配置未覆盖：{0}", "检测失败：{0}", "显示器恢复失败：{0}",
-        "恢复失败：{0}", "WMI 亮度调节失败：{0}", "保存设置失败：{0}", "硬件刷新失败：{0}", "时间计划未应用：{0}" };
+        "恢复失败：{0}", "WMI 亮度调节失败：{0}", "保存设置失败：{0}", "硬件刷新失败：{0}", "时间计划未应用：{0}",
+        "音量调节失败：{0}", "亮度调节失败：{0}", "色温调节失败：{0}", "边缘滚轮监听失败：{0}" };
 
     public static string Resolve(string? preference, CultureInfo? systemCulture = null) => preference switch
     {
