@@ -1,12 +1,15 @@
-param([string]$Dotnet = 'dotnet', [switch]$Package)
+param([string]$Dotnet = 'dotnet', [switch]$Package, [string]$Pnpm = 'pnpm')
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 Push-Location $projectRoot
 try {
     if (-not (Get-Command $Dotnet -ErrorAction SilentlyContinue)) { throw '.NET 10 SDK not found. Pass -Dotnet with its executable path.' }
-    & npm --prefix src/MonitorsFocus.Web ci
+    if (-not (Get-Command $Pnpm -ErrorAction SilentlyContinue)) { throw 'pnpm 12.16.1 not found. Pass -Pnpm with its executable path.' }
+    $pnpmVersion = & $Pnpm --version
+    if ($LASTEXITCODE -or $pnpmVersion.Trim() -ne '12.16.1') { throw 'pnpm 12.16.1 is required. Pass -Pnpm with its executable path.' }
+    & $Pnpm --dir src/MonitorsFocus.Web install --frozen-lockfile
     if ($LASTEXITCODE) { throw 'Frontend dependency restore failed.' }
-    & npm --prefix src/MonitorsFocus.Web run build
+    & $Pnpm --dir src/MonitorsFocus.Web run build
     if ($LASTEXITCODE) { throw 'Frontend build failed.' }
     & $Dotnet build MonitorsFocus.sln -c Release --nologo
     if ($LASTEXITCODE) { throw 'Desktop build failed.' }

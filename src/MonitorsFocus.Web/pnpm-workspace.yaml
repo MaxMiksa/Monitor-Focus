@@ -1,0 +1,6 @@
+nodeLinker: isolated
+enableGlobalVirtualStore: true
+storeDir: D:/.pnpm-store
+cacheDir: .pnpm-cache
+strictDepBuilds: true
+allowBuilds: {}
