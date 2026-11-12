@@ -1,0 +1,12 @@
+[
+  {
+    "TimeCreated": "2026-11-03T20:09:04.097249+08:00",
+    "Id": 21,
+    "Message": "远程桌面服务: 会话登录成功:\r\n\r\n用户: ABYSSALDRAGON\\BGIDaily\r\n会话 ID: 4\r\n源网络地址: 127.0.0.1"
+  },
+  {
+    "TimeCreated": "2026-11-03T20:08:34.7770962+08:00",
+    "Id": 23,
+    "Message": "远程桌面服务: 会话注销成功:\r\n\r\n用户: ABYSSALDRAGON\\BGIDaily\r\n会话 ID: 3"
+  }
+]
