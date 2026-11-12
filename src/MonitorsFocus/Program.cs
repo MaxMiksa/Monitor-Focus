@@ -8,6 +8,7 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        if (!Monitoring.PhysicalDisplayScope.IsConsole) return;
         using var instance = new Mutex(true, @"Local\MonitorsFocus." + Environment.UserName, out var created);
         if (!created) return;
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);

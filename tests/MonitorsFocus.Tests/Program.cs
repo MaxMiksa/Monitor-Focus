@@ -9,6 +9,7 @@ using MonitorsFocus.Settings;
 System.Windows.Forms.Application.SetHighDpiMode(System.Windows.Forms.HighDpiMode.PerMonitorV2);
 
 if (args.Contains("--window-fixture")) { WindowDetectionChecks.RunFixture(); return; }
+if (args.Contains("--gamma-probe")) { GammaProbe.Run(args); return; }
 
 if (args.Contains("--probe"))
 {
@@ -18,7 +19,7 @@ if (args.Contains("--probe"))
         var identity = DisplayIdentity.FindInstance(monitor.Id);
         Console.WriteLine($"Display={monitor.Id}; Primary={monitor.IsPrimary}; IdentityMapped={identity != null}");
         using var ddc = DdcBrightnessDevice.Open(monitor);
-        using var wmi = WmiBrightnessController.Open(identity);
+        using var wmi = WmiBrightnessController.Open(identity, monitor.Id);
         Console.WriteLine($"  DDC brightness={ddc?.ReadBrightness().ToString() ?? "unavailable"}; Matched WMI brightness={wmi?.ReadBrightness().ToString() ?? "unavailable"}");
         if (!NativeMethods.GetNumberOfPhysicalMonitorsFromHMONITOR(monitor.Handle, out var count) || count != 1) continue;
         var handles = new NativeMethods.PHYSICAL_MONITOR[count];
@@ -43,6 +44,22 @@ if (args.Contains("--probe"))
 
 var tests = new (string Name, Func<Task> Run)[]
 {
+    ("Brightness calibration matches all measured points, inverse mapping and saturation", BrightnessLinkChecks.CurveAsync),
+    ("Brightness calibration rejects invalid identities and nonmonotonic or incomplete curves", BrightnessLinkChecks.ValidationAsync),
+    ("Calibrated linking works at all temperatures, both sliders, zero, offline, scenes and schedules", ControlCenterChecks.CalibratedBindingAsync),
+    ("Temperature brightness interpolates measured references, preserves native and reports limits", TemperatureBrightnessChecks.InterpolationAsync),
+    ("Temperature brightness rejects incomplete or inconsistent calibration and preserves legacy settings", TemperatureBrightnessChecks.ValidationAsync),
+    ("Temperature brightness orders writes without a bright flash and removes boost on restore and exit", TemperatureBrightnessChecks.RestoreAsync),
+    ("Rejected temperature removes the backlight boost while brightness remains adjustable", TemperatureBrightnessChecks.ColorFailureAsync),
+    ("Only the calibrated internal display is compensated; saves, native restore and upper limits are respected", ControlCenterChecks.TemperatureCompensationAsync),
+    ("Gamma warmth preserves and recaptures original ramps without repeated writes", GammaColorChecks.BaselineAsync),
+    ("Gamma conflict yields to another color tool and preserves its newer state", GammaColorChecks.ConflictAsync),
+    ("Gamma rejects silent failures and restores writes even after a failed return", GammaColorChecks.RejectionAsync),
+    ("Gamma does not write in HDR or Advanced Color mode", GammaColorChecks.AdvancedColorAsync),
+    ("Gamma isolates outputs, bypasses hardware color and restores before disposal", GammaColorChecks.IsolationAsync),
+    ("Gamma failure leaves hardware brightness usable", GammaColorChecks.FailureIsolationAsync),
+    ("Session Gamma reset recovers unchanged targets and yields to external colors", ControlCenterChecks.SessionGammaRecoveryAsync),
+    ("Physical display scope rejects background sessions, remapped and unknown outputs", GammaColorChecks.ForegroundScopeAsync),
     ("Live manual handoff fades from current levels; explicit resume recomputes clock position", ControlCenterChecks.ManualHandoffAsync),
     ("Missed schedule node after sleep computes current position without replay", ControlCenterChecks.MissedNodeAsync),
     ("Language and focus saves preserve manual overrides and do not replay scene rules", ControlCenterChecks.UnrelatedSaveAsync),
@@ -307,7 +324,7 @@ var tests = new (string Name, Func<Task> Run)[]
         var settings = store.Load();
         Check(settings.LaunchOnStartup);
         Equal(42, settings.FocusDelaySeconds);
-        Equal(17, settings.FocusBrightness);
+        Check(!System.Text.Json.JsonSerializer.Serialize(settings).Contains("FocusBrightness"));
         Check(!settings.FocusEnabled);
         Equal(original, File.ReadAllText(path));
         Equal(original, File.ReadAllText(path + ".pre-center.bak"));

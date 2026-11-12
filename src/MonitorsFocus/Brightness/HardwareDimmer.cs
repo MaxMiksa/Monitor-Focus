@@ -45,7 +45,7 @@ internal sealed class HardwareDimmer
                 try
                 {
                     device = await Task.Run(() => DdcBrightnessDevice.Open(monitor)
-                        ?? WmiBrightnessController.Open(DisplayIdentity.FindInstance(monitor.Id))).ConfigureAwait(false);
+                        ?? WmiBrightnessController.Open(DisplayIdentity.FindInstance(monitor.Id), monitor.Id)).ConfigureAwait(false);
                     if (device == null)
                     {
                         Publish(generation, monitor.Id, Capability.Unsupported("No safely mapped brightness device."));

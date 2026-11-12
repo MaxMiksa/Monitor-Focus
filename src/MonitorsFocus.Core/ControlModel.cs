@@ -1,7 +1,7 @@
 namespace MonitorsFocus.Core;
 
 public sealed record DisplayState(string Id, string Name, int Brightness, bool CanAdjust,
-    bool CanAdjustColor, int? Kelvin, string? Error, bool IsPrimary);
+    bool CanAdjustColor, int? Kelvin, string? Error, bool IsPrimary, int? BacklightTarget = null);
 public sealed record ControlSnapshot(List<DisplayState> Displays, ControlSettings Settings,
     bool FocusPaused, string Source, string? Error = null, string? Warning = null, string? SystemLanguage = null);
 public sealed record ControlRequest(string Action, string? Id = null, int? Value = null, ControlSettings? Settings = null);
@@ -13,11 +13,12 @@ public sealed class ControlSettings
     public string Language { get; set; } = "system";
     public bool Linked { get; set; }
     public Dictionary<string, double> LinkWeights { get; set; } = new();
+    public BrightnessLinkCalibration? BrightnessLinkCalibration { get; set; }
+    public Dictionary<string, TemperatureBrightnessCalibration> TemperatureBrightnessCalibrations { get; set; } = new();
     public bool FocusEnabled { get; set; }
     public List<string>? ControlledDisplayIds { get; set; }
     public bool KeepSecondaryAwakeOnFullscreen { get; set; } = true;
     public int FocusDelaySeconds { get; set; } = 180;
-    public int FocusBrightness { get; set; } = 10;
     public bool ScheduleEnabled { get; set; }
     public bool LaunchOnStartup { get; set; }
     public List<Scene> Scenes { get; set; } = new();
@@ -131,9 +132,14 @@ public static class DailyPlan
     {
         if (settings.SchemaVersion != 1) throw new ArgumentException("配置版本不受支持。");
         if (settings.Language is not ("system" or "zh-CN" or "en")) throw new ArgumentException("不支持的语言设置。");
-        if (settings.FocusDelaySeconds is < 0 or > 600 || settings.FocusBrightness is < 0 or > 100)
+        if (settings.FocusDelaySeconds is < 0 or > 600)
             throw new ArgumentException("专注参数超出范围。");
         ValidateBinding(settings.Linked, settings.LinkWeights);
+        settings.BrightnessLinkCalibration?.Validate();
+        if (settings.TemperatureBrightnessCalibrations == null || settings.TemperatureBrightnessCalibrations.Count > 16 ||
+            settings.TemperatureBrightnessCalibrations.Any(p => string.IsNullOrWhiteSpace(p.Key) || p.Value == null))
+            throw new ArgumentException("色温亮度校准数据无效。");
+        foreach (var calibration in settings.TemperatureBrightnessCalibrations.Values) calibration.Validate();
         if (settings.Scenes.Select(x => x.Id).Distinct().Count() != settings.Scenes.Count)
             throw new ArgumentException("场景标识重复。");
         foreach (var scene in settings.Scenes)

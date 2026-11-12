@@ -1,0 +1,18 @@
+{
+  "SourceId": "DISPLAY\\AOCB422\\5&14d2c526&0&UID4355",
+  "TargetId": "DISPLAY\\BOE0D55\\5&14d2c526&0&UID4352",
+  "Points": [
+    { "Source": 0, "Target": 25 },
+    { "Source": 5, "Target": 35 },
+    { "Source": 10, "Target": 45 },
+    { "Source": 20, "Target": 55 },
+    { "Source": 30, "Target": 65 },
+    { "Source": 40, "Target": 70 },
+    { "Source": 50, "Target": 75 },
+    { "Source": 60, "Target": 80 },
+    { "Source": 70, "Target": 85 },
+    { "Source": 80, "Target": 90 },
+    { "Source": 95, "Target": 100 },
+    { "Source": 100, "Target": 100 }
+  ]
+}

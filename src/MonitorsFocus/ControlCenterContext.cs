@@ -22,9 +22,14 @@ internal sealed class ControlCenterContext : ApplicationContext
         public int Brightness;
         public int? Kelvin;
         public string? Error;
+        public bool IsInternal;
+        public string? CompensationWarning;
+        public int? BacklightTarget;
         public OverlayForm? Overlay;
         public readonly FocusDimming Focus = new();
         public (int, int, int?)? LastRequest;
+        public long NextColorCheck;
+        public Task LastApply = Task.CompletedTask;
     }
 
     private readonly SynchronizationContext _ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
@@ -113,6 +118,7 @@ internal sealed class ControlCenterContext : ApplicationContext
                     var identity = DisplayIdentity.FindInstance(monitor.Id);
                     IBrightnessDevice? device = null;
                     ControlledDisplay? controller = null;
+                    ITemperatureDevice? color = null;
                     string? error = null;
                     try
                     {
@@ -121,16 +127,21 @@ internal sealed class ControlCenterContext : ApplicationContext
                             device = DdcBrightnessDevice.Open(monitor);
                             if (device == null && attempt == 0) Thread.Sleep(200);
                         }
-                        device ??= WmiBrightnessController.Open(identity);
-                        if (device != null) controller = new ControlledDisplay(device);
+                        device ??= WmiBrightnessController.Open(identity, monitor.Id);
+                        if (device != null)
+                        {
+                            color = GammaColorDevice.Open(monitor.Id, out error);
+                            controller = new ControlledDisplay(device, color);
+                        }
                     }
-                    catch (Exception ex) { device?.Dispose(); error = ex.Message; }
+                    catch (Exception ex) { color?.Dispose(); device?.Dispose(); error = ex.Message; }
                     return new Display
                     {
                         Monitor = monitor, Id = identity ?? monitor.Id,
                         Name = identity?.Contains("AOC", StringComparison.OrdinalIgnoreCase) == true ? "AOC U27G4" :
                             identity?.Contains("BOE", StringComparison.OrdinalIgnoreCase) == true ? "笔记本屏幕" : monitor.Id,
                         Controller = controller, Brightness = controller?.InitialBrightness ?? 0,
+                        IsInternal = DisplayColorMode.IsInternal(monitor.Id),
                         Error = error ?? (controller == null ? "硬件亮度不可用" : null)
                     };
                 });
@@ -150,6 +161,15 @@ internal sealed class ControlCenterContext : ApplicationContext
         }
         catch (Exception ex) { _error = $"检测失败：{ex.Message}"; }
         finally { _scanning = false; _scanGate.Release(); }
+    }
+
+    private void ApplyBrightness(Display display, int value)
+    {
+        var values = _settings.Linked ? LinkedBrightness(display.Id, value)
+            : new Dictionary<string, int> { [display.Id] = value };
+        foreach (var d in _displays)
+            if (values.TryGetValue(d.Id, out var brightness)) { d.Brightness = brightness; d.Focus.Reset(); }
+        HoldManual();
     }
 
     private void Tick()
@@ -182,6 +202,7 @@ internal sealed class ControlCenterContext : ApplicationContext
                             d.Brightness = brightness;
                             d.Kelvin = d.Controller?.SupportsColor == true ? kelvin : null;
                         }
+                    ApplyCalibratedLink(activePlan.Scene.Targets);
                     _sourceScene = activePlan.Scene;
                     _sourceIsPlan = true;
                     _planError = null;
@@ -204,11 +225,19 @@ internal sealed class ControlCenterContext : ApplicationContext
             var dim = d.Focus.Update(_settings, _paused, d.Monitor.IsPrimary, d.Monitor.Bounds.Contains(cursor),
                 _fullscreenDisplays.Contains(d.Monitor.Id), now, d.Id);
             if (dim) d.Overlay?.ShowOverlay(); else d.Overlay?.HideOverlay();
-            var effective = dim ? Math.Min(d.Brightness, _settings.FocusBrightness) : d.Brightness;
-            var target = (d.Brightness, effective, d.Kelvin);
-            if (d.LastRequest == target) continue;
+            var compensation = d.IsInternal && d.Controller?.SupportsColor == true &&
+                _settings.TemperatureBrightnessCalibrations.TryGetValue(d.Id, out var calibration)
+                ? calibration.Evaluate(d.Brightness, d.Kelvin) : new CompensatedBrightness(d.Brightness, false);
+            d.CompensationWarning = compensation.Limited ? "内屏背光已达上限，当前色温下无法完全补偿亮度" : null;
+            d.BacklightTarget = compensation.Value;
+            var target = (d.Brightness, compensation.Value, d.Kelvin);
+            // Session initialization can reset Gamma without changing display topology.
+            // Recheck active warmth through the serialized worker, not on the UI thread.
+            if (d.LastRequest == target && (d.Kelvin is not (< 6500) ||
+                d.Controller?.SupportsColor != true || now < d.NextColorCheck)) continue;
+            d.NextColorCheck = now + 3000;
             d.LastRequest = target;
-            if (d.Controller != null) _ = d.Controller.ApplyAsync(d.Brightness, effective, d.Kelvin);
+            if (d.Controller != null) d.LastApply = d.Controller.ApplyAsync(d.Brightness, compensation.Value, d.Kelvin);
         }
         _timer.Interval = _settings.FocusEnabled && !_paused ? 50 : 1000;
     }
@@ -221,6 +250,32 @@ internal sealed class ControlCenterContext : ApplicationContext
                 d.Brightness = target.Brightness;
                 d.Kelvin = d.Controller?.SupportsColor == true ? QuantizeKelvin(target.Kelvin) : null;
             }
+        ApplyCalibratedLink(targets);
+    }
+
+    private Dictionary<string, int> LinkedBrightness(string anchor, int value)
+    {
+        var available = _displays.Where(d => d.Controller != null).Select(d => d.Id).ToArray();
+        var calibration = _settings.BrightnessLinkCalibration;
+        if (calibration != null && (anchor == calibration.SourceId || anchor == calibration.TargetId))
+            return calibration.MatchesPair(available)
+                ? calibration.Calculate(anchor, value, _displays.Single(d => d.Id == calibration.SourceId).Brightness)
+                : new() { [anchor] = value };
+        return RatioBinding.CalculateAvailable(_settings.LinkWeights,
+            available.Where(id => calibration == null || (id != calibration.SourceId && id != calibration.TargetId)), anchor, value);
+    }
+
+    private void ApplyCalibratedLink(IReadOnlyDictionary<string, DisplayTarget>? targets = null)
+    {
+        var calibration = _settings.BrightnessLinkCalibration;
+        if (!_settings.Linked || calibration == null ||
+            !calibration.MatchesPair(_displays.Where(d => d.Controller != null).Select(d => d.Id))) return;
+        var anchor = targets == null || targets.ContainsKey(calibration.SourceId) ? calibration.SourceId :
+            targets.ContainsKey(calibration.TargetId) ? calibration.TargetId : null;
+        if (anchor == null) return;
+        var values = LinkedBrightness(anchor, _displays.Single(d => d.Id == anchor).Brightness);
+        foreach (var d in _displays)
+            if (values.TryGetValue(d.Id, out var brightness)) d.Brightness = brightness;
     }
 
     private static int? QuantizeKelvin(int? value) => value.HasValue ? (int)Math.Round(value.Value / 100.0) * 100 : null;
@@ -263,15 +318,15 @@ internal sealed class ControlCenterContext : ApplicationContext
                     var display = _displays.Single(d => d.Id == request.Id);
                     if (display.Controller == null) throw new InvalidOperationException("此显示器不支持亮度调节。");
                     var value = Math.Clamp(request.Value ?? display.Brightness, 0, 100);
-                    var values = _settings.Linked ? RatioBinding.CalculateAvailable(_settings.LinkWeights,
-                        _displays.Where(d => d.Controller != null).Select(d => d.Id), display.Id, value)
-                        : new Dictionary<string, int> { [display.Id] = value };
-                    foreach (var d in _displays)
-                        if (values.TryGetValue(d.Id, out var brightness)) { d.Brightness = brightness; d.Focus.Reset(); }
-                    HoldManual();
+                    ApplyBrightness(display, value);
                     break;
                 case "temperature":
-                    foreach (var d in _displays.Where(d => d.Controller?.SupportsColor == true))
+                    var colorDisplays = request.Id == null
+                        ? _displays.Where(d => d.Controller?.SupportsColor == true).ToArray()
+                        : new[] { _displays.Single(d => d.Id == request.Id) };
+                    if (colorDisplays.Any(d => d.Controller?.SupportsColor != true))
+                        throw new InvalidOperationException("色温暂不可用，可在设置中重新检测");
+                    foreach (var d in colorDisplays)
                         d.Kelvin = QuantizeKelvin(Math.Clamp(request.Value ?? 6500, 2700, 6500));
                     HoldManual();
                     break;
@@ -282,13 +337,16 @@ internal sealed class ControlCenterContext : ApplicationContext
                 case "link":
                     var enabled = request.Value == 1;
                     var weights = _displays.Where(d => d.Controller != null).ToDictionary(d => d.Id, d => (double)d.Brightness);
-                    if (enabled && (weights.Count < 2 || weights.Values.Any(x => x <= 0)))
+                    var calibrated = _settings.BrightnessLinkCalibration?.MatchesPair(weights.Keys) == true;
+                    if (enabled && (weights.Count < 2 || (!calibrated && weights.Values.Any(x => x <= 0))))
                         throw new ArgumentException("请先为两块可调屏幕设置非零亮度。");
                     var linkedSettings = CloneSettings();
                     linkedSettings.Linked = enabled;
-                    if (enabled) linkedSettings.LinkWeights = weights;
+                    if (enabled) linkedSettings.LinkWeights = calibrated
+                        ? weights.ToDictionary(p => p.Key, p => Math.Max(1, p.Value)) : weights;
                     _store.Save(linkedSettings);
                     _settings = linkedSettings;
+                    ApplyCalibratedLink();
                     break;
                 case "scene":
                     var scene = _settings.Scenes.Single(s => s.Id == request.Id);
@@ -328,7 +386,10 @@ internal sealed class ControlCenterContext : ApplicationContext
     private void ApplySavedSettings(ControlSettings settings)
     {
         var planChanged = !DailyPlan.HasSameDefinition(_settings, settings);
+        var bindingChanged = settings.Linked != _settings.Linked ||
+            JsonSerializer.Serialize(settings.BrightnessLinkCalibration) != JsonSerializer.Serialize(_settings.BrightnessLinkCalibration);
         _settings = settings;
+        if (bindingChanged) ApplyCalibratedLink();
         if (planChanged)
         {
             _activePlanAt = null;
@@ -345,11 +406,12 @@ internal sealed class ControlCenterContext : ApplicationContext
 
     private ControlSnapshot Snapshot(string? error = null) => new(_displays.Select(d => new DisplayState(d.Id, d.Name == "笔记本屏幕" ? T(d.Name) : d.Name,
         d.Brightness, d.Controller != null, d.Controller?.SupportsColor == true, d.Kelvin,
-        Localization.Message(d.Controller?.Error ?? d.Error, _settings.Language), d.Monitor.IsPrimary)).ToList(), CloneSettings(), _paused,
+        Localization.Message(d.Controller?.Error ?? d.Error, _settings.Language), d.Monitor.IsPrimary, d.BacklightTarget)).ToList(), CloneSettings(), _paused,
         _scanning ? T("正在检测显示器…") : _sourceScene != null
             ? Localization.Format(_sourceIsPlan ? "时间计划 · {0}" : "场景 · {0}", _settings.Language, Localization.SceneName(_sourceScene, _settings.Language))
             : _manualUntil.HasValue ? Localization.Format("手动 · 保持至 {0}", _settings.Language, _manualUntil.Value.ToString("HH:mm"))
-            : T("手动调节"), Localization.Message(error, _settings.Language), Localization.Message(_planError ?? _error, _settings.Language), Localization.Resolve("system"));
+            : T("手动调节"), Localization.Message(error, _settings.Language), Localization.Message(_planError ?? _error ??
+                _displays.Select(d => d.CompensationWarning).FirstOrDefault(w => w != null), _settings.Language), Localization.Resolve("system"));
 
     private async Task ServeAsync()
     {
@@ -360,6 +422,7 @@ internal sealed class ControlCenterContext : ApplicationContext
                 using var pipe = new NamedPipeServerStream(ControlProtocol.PipeName, PipeDirection.InOut, 1,
                     PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                 await pipe.WaitForConnectionAsync(_lifetime.Token).ConfigureAwait(false);
+                PhysicalDisplayScope.EnsureClient(pipe.SafePipeHandle.DangerousGetHandle());
                 using var reader = new StreamReader(pipe, leaveOpen: true);
                 using var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
                 var line = await reader.ReadLineAsync(_lifetime.Token).ConfigureAwait(false);

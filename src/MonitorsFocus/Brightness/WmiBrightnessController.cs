@@ -7,16 +7,19 @@ internal sealed class WmiBrightnessController : IBrightnessDevice
 {
     private readonly string _instanceName;
     private readonly byte[] _levels;
+    private readonly PhysicalDisplayScope _scope;
 
-    private WmiBrightnessController(string instanceName, byte[] levels)
+    private WmiBrightnessController(string instanceName, byte[] levels, PhysicalDisplayScope scope)
     {
         _instanceName = instanceName;
         _levels = levels;
+        _scope = scope;
     }
 
-    public static IBrightnessDevice? Open(string? deviceInstance)
+    public static IBrightnessDevice? Open(string? deviceInstance, string displayName)
     {
         if (deviceInstance == null) return null;
+        var scope = new PhysicalDisplayScope(displayName);
         using var searcher = new ManagementObjectSearcher("root\\wmi", "SELECT * FROM WmiMonitorBrightness");
         using var results = searcher.Get();
         WmiBrightnessController? match = null;
@@ -29,7 +32,7 @@ internal sealed class WmiBrightnessController : IBrightnessDevice
                 if (match != null) return null;
                 var levels = (byte[])item["Level"];
                 if (levels.Length == 0) return null;
-                match = new WmiBrightnessController(name, levels.Distinct().Order().ToArray());
+                match = new WmiBrightnessController(name, levels.Distinct().Order().ToArray(), scope);
             }
         }
         return match;
@@ -60,6 +63,7 @@ internal sealed class WmiBrightnessController : IBrightnessDevice
             using (item)
             {
                 if (!string.Equals((string)item["InstanceName"], _instanceName, StringComparison.OrdinalIgnoreCase)) continue;
+                _scope.Ensure();
                 var result = item.InvokeMethod("WmiSetBrightness", new object[] { 1u, target });
                 if (result != null && Convert.ToUInt32(result) != 0)
                     throw new InvalidOperationException($"WMI brightness failed: {result}");

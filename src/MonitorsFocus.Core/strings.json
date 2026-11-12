@@ -176,5 +176,22 @@
   "{0}恢复原色": "Restore native color for {0}",
   "删除场景": "Delete scene",
   "先移除时间计划中的引用，再删除场景。": "Remove schedule references before deleting this scene.",
-  "关闭前未能恢复显示器。": "The monitor could not be restored before closing."
+  "关闭前未能恢复显示器。": "The monitor could not be restored before closing.",
+  "前台屏幕绑定已变化，已停止控制；请重新检测": "The foreground display binding changed. Control stopped; detect displays again.",
+  "仅允许前台会话控制实体屏幕": "Only the physical console session may control displays.",
+  "亮度联动校准数据无效。": "Invalid brightness linking calibration.",
+  "色温暂不可用，可在设置中重新检测": "Temperature unavailable. Rescan in Settings.",
+  "HDR 或高级颜色模式下暂不调色": "Color adjustment is unavailable in HDR or Advanced Color mode.",
+  "颜色已被其他程序更改，已停止调色；请重新检测后重试": "Another app changed the display colors. Adjustment stopped; rescan to retry.",
+  "屏幕未接受色温设置，请检查夜间模式或其他调色软件": "The display did not accept the temperature setting. Check Night light or other color tools.",
+  "恢复原色失败，请重新检测显示器": "Could not restore native colors. Rescan displays.",
+  "无法打开屏幕颜色控制": "Cannot open display color control.",
+  "无法读取屏幕原色": "Cannot read native display colors.",
+  "屏幕颜色数据长度无效。": "The display color data has an invalid length.",
+  "现有颜色校准超出系统调色范围，暂不调色": "The current calibration exceeds the system color adjustment range. Adjustment is unavailable.",
+  "色温亮度校准数据无效。": "The temperature brightness calibration is invalid.",
+  "色温亮度校准需要两个亮度和两个暖度的完整参照。": "Temperature brightness calibration requires complete references at two brightness levels and two warmth levels.",
+  "色温亮度校准曲线必须随亮度递增。": "The temperature brightness calibration curve must increase with brightness.",
+  "较暖色温的补光不能小于较冷色温。": "Warmer temperatures cannot require less brightness compensation than cooler temperatures.",
+  "内屏背光已达上限，当前色温下无法完全补偿亮度": "The laptop backlight has reached its limit; brightness cannot be fully compensated at this temperature."
 }

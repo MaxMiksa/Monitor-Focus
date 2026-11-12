@@ -36,8 +36,7 @@ internal sealed class ControlSettingsStore
         {
             LaunchOnStartup = legacy.LaunchOnStartup,
             Language = legacy.Language.Preference(),
-            FocusDelaySeconds = legacy.DelaySeconds,
-            FocusBrightness = legacy.HardwareDimLevel
+            FocusDelaySeconds = legacy.DelaySeconds
         };
         var backup = legacyPath + ".pre-center.bak";
         if (!File.Exists(backup)) File.Copy(legacyPath, backup);

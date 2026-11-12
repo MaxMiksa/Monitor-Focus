@@ -9,16 +9,19 @@ internal sealed class DdcBrightnessDevice : IColorDevice
     private readonly NativeMethods.PHYSICAL_MONITOR[] _handles;
     private readonly uint _min;
     private readonly uint _max;
+    private readonly PhysicalDisplayScope _scope;
 
-    private DdcBrightnessDevice(NativeMethods.PHYSICAL_MONITOR[] handles, uint min, uint max)
+    private DdcBrightnessDevice(NativeMethods.PHYSICAL_MONITOR[] handles, uint min, uint max, PhysicalDisplayScope scope)
     {
         _handles = handles;
         _min = min;
         _max = max;
+        _scope = scope;
     }
 
     public static IBrightnessDevice? Open(MonitorInfo monitor)
     {
+        var scope = new PhysicalDisplayScope(monitor.Id);
         if (monitor.Handle == IntPtr.Zero ||
             !NativeMethods.GetNumberOfPhysicalMonitorsFromHMONITOR(monitor.Handle, out var count) || count != 1)
             return null;
@@ -34,7 +37,7 @@ internal sealed class DdcBrightnessDevice : IColorDevice
             // color probe fail at startup. Spend one throwaway read and let the channel settle.
             NativeMethods.GetVCPFeatureAndVCPFeatureReply(handles[0].hPhysicalMonitor, 0x10, IntPtr.Zero, out _, out _);
             Thread.Sleep(150);
-            var device = new DdcBrightnessDevice(handles, min, max);
+            var device = new DdcBrightnessDevice(handles, min, max, scope);
             transferred = true;
             return device;
         }
@@ -45,10 +48,11 @@ internal sealed class DdcBrightnessDevice : IColorDevice
     }
 
     // DDC/CI over I2C occasionally NAKs a command (seen on AOC U27G4); retry after the MCCS settle time.
-    private static bool Retry(Func<bool> command)
+    private bool Retry(Func<bool> command)
     {
         for (var attempt = 0; ; attempt++)
         {
+            _scope.Ensure();
             if (command()) return true;
             if (attempt == 2) return false;
             Thread.Sleep(50);
