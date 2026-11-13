@@ -1,17 +1,16 @@
 # Project rules
 
-Windows display controller: brightness/color, scenes, schedules, focus, optional edge scrolling. Stack: C#/.NET 10, React/TypeScript, WebView2.
+Windows display controller: brightness/color, scenes, schedules, focus and edge scrolling. Go/Wails 3, React/TypeScript, WebView2. One workspace; sole local branch: main.
 
-Docs: [中文](README-zh.md), [English](README.md), [Index](docs/INDEX.md), [Product](docs/PRODUCT.md), [Development](docs/DEVELOPMENT.md), [Design](docs/DESIGN.md), [Acceptance](docs/ACCEPTANCE.md).
+Docs: README.md (Chinese entry); docs/PRODUCT.md (behavior/design), DEVELOPMENT.md (build/architecture), STATUS.md (verified/open items).
 
-- Reply concisely in Chinese; clarify material ambiguity. Keep changes focused and follow existing conventions/dependencies.
-- Maintain affected docs before/after implementation; keep this file under 500 tokens. Progress belongs in Acceptance.
-- Substantial UI changes need an approved visual; small changes reuse components. Run proportionate checks; clean temporary files, retain user data/caches. No automatic commit/push/release. `Files/` is historical.
-- `src/MonitorsFocus` owns hardware/legacy entry; `--center --background` selects the core. `.Core` holds protocol/computation; `.Web` React; `.WebHost` on-demand UI. No production HTTP backend or runtime Node/Vite. Bridge: allowlisted commands, validated origins, no general execution.
-- Serialize hardware calls; timeout is not cancellation. Drain before releasing handles; report failures honestly.
-- Write/restore only identified physical-console displays; reject other sessions. Background RDP capture isolation requires separate acceptance.
-- Gamma: preserve/verify originals per display; reject HDR/uncertain mapping; preserve newer external colors.
-- Compensation: calibrated internal display only, separate user/backlight targets, withdraw on restore/failure/exit. Device-pair brightness curves stay separate; personal calibration is not a default.
-- Revision conflicts retain drafts. Back up migration; failed reads/migration must not change startup.
-- Disable/exit unhooks edge input; callbacks do no hardware work. Modifier feedback (Alt default) reuses one lazy native window; app sessions share one mixer percentage. Ordinary edges use native OSD; brightness shows the internal panel.
-- One startup entry: self-contained `core/MonitorsFocus.exe --center --background`. Build Web before C# with `scripts/build.ps1`. SDK, Node/pnpm versions, local paths and commands: Development.
+- Reply concisely in Chinese. Update docs before/after; retain current guidance only. Keep this file under 500 tokens. No automatic commit/push/release.
+- Go sources at root; internal/{win32,audio,desktop,domain,startup}; frontend/ for UI; scripts/build.ps1 is the build entry. build/ holds generated output and the active package: check running/self-start paths before cleanup. No legacy stack or separate lab.
+- Substantial UI changes require approved visuals; reuse components. Test proportionately; recycle obsolete files. Preserve live settings, calibration and shared caches.
+- Validate bridge origins/actions; no general execution or production Node/business HTTP backend.
+- Serialize hardware; timeout is not cancellation. Drain before release and report errors. Write/restore only identified physical-console devices; RDP capture isolation remains unverified.
+- Gamma: preserve verified originals and newer external colors; reject HDR/uncertain identity. Compensation only for calibrated internal panels; separate normal/backlight targets and pair curves. Withdraw compensation before color restore/failure/exit. Never default personal calibration.
+- Revision conflicts preserve drafts. Back up migrations; failed read/migration/init must not change startup.
+- Disable/exit unhooks input; callbacks do no hardware work. Reuse lazy modifier feedback. Missing app audio uses throttled tray notices, never fabricated 0%. Ordinary edges use native OSD; brightness reports the internal panel.
+- Unique startup: MonitorsFocus.Go.exe --mode native --hardware --production --background. Exit retains latest normal brightness and restores color.
+- Current checks, deployment and unresolved acceptance: docs/STATUS.md. Tool paths and Go memory-overlay maintenance: docs/DEVELOPMENT.md.

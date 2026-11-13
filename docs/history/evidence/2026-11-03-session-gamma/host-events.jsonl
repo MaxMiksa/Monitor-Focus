@@ -1,4 +1,0 @@
-{"Time":"2026-11-03T20:09:01.9888016+08:00","Phase":"handle-created","HostPid":37692,"ForegroundPid":44444,"Bounds":{"Left":-1216,"Top":-712,"Width":1152,"Height":648},"IntersectsDisplay":false,"CursorFlags":1}
-{"Time":"2026-11-03T20:09:02.1059808+08:00","Phase":"shown","HostPid":37692,"ForegroundPid":44444,"Bounds":{"Left":-1216,"Top":-712,"Width":1152,"Height":648},"IntersectsDisplay":false,"CursorFlags":1}
-{"Time":"2026-11-03T20:09:02.1961361+08:00","Phase":"before-connect","HostPid":37692,"ForegroundPid":44444,"Bounds":{"Left":-1216,"Top":-712,"Width":1152,"Height":648},"IntersectsDisplay":false,"CursorFlags":1}
-{"Time":"2026-11-03T20:09:02.4638166+08:00","Phase":"after-connect","HostPid":37692,"ForegroundPid":44444,"Bounds":{"Left":-1216,"Top":-712,"Width":1152,"Height":648},"IntersectsDisplay":false,"CursorFlags":1}

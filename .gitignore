@@ -1,28 +1,8 @@
-# Build artifacts
-bin/
-obj/
-.vs/
-.vscode/
-*.user
-*.suo
-publish/
+# Generated output and local development state
+/build/
 node_modules/
 dist/
+.pnpm-cache/
+*.tsbuildinfo
+.vscode/
 .playwright-mcp/
-TESTING_WIN11.md
-CODEX.md
-
-# Local-only workspace docs (never commit)
-Files/
-.workbuddy/
-
-# Archives and internal docs
-Archive/
-AI_RELEASE_RULES.md
-CHECKLIST.md
-AGENT.md
-PRD.md
-DEV.md
-RELEASE_NOTE.md
-CODEX.md
-Logs.md

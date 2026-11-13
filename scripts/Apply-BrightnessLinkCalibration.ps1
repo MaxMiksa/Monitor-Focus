@@ -3,26 +3,12 @@ param(
     [switch]$EnableLink
 )
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/NativeControl.ps1"
 $calibration = Get-Content -LiteralPath $InputPath -Raw | ConvertFrom-Json
 if (-not $calibration.SourceId -or -not $calibration.TargetId -or @($calibration.Points).Count -lt 2) { throw '校准结果不完整。' }
 
-function Send-BrightnessLinkRequest([object]$Request) {
-    $pipe = [System.IO.Pipes.NamedPipeClientStream]::new('.', ('MonitorsFocus.ControlCenter.' + [Environment]::UserName), 'InOut')
-    try {
-        $pipe.Connect(3000)
-        $writer = [System.IO.StreamWriter]::new($pipe, [System.Text.UTF8Encoding]::new($false), 1024, $true)
-        $writer.AutoFlush = $true
-        $writer.WriteLine(($Request | ConvertTo-Json -Depth 32 -Compress))
-        $reader = [System.IO.StreamReader]::new($pipe, [System.Text.Encoding]::UTF8, $false, 1024, $true)
-        $reply = $reader.ReadLineAsync()
-        if (-not $reply.Wait(5000)) { throw '控制核心未及时回应。' }
-        $response = $reply.Result | ConvertFrom-Json
-        if ($response.Error) { throw $response.Error }
-        return $response
-    } finally { $pipe.Dispose() }
-}
 
-$snapshot = Send-BrightnessLinkRequest @{Action='snapshot'}
+$snapshot = Send-Go @{Action='snapshot'}
 if ($null -eq $snapshot.Settings.PSObject.Properties['BrightnessLinkCalibration']) { throw '请先启动支持校准联动的新版核心。' }
 foreach ($id in @($calibration.SourceId, $calibration.TargetId)) {
     if (@($snapshot.Displays | Where-Object { $_.Id -eq $id -and $_.CanAdjust }).Count -ne 1) {
@@ -37,7 +23,7 @@ if ($EnableLink) {
     }
 }
 # A fresh Revision and core-side validation protect against concurrent edits and malformed samples.
-$saved = Send-BrightnessLinkRequest @{Action='save';Settings=$snapshot.Settings}
+$saved = Send-Go @{Action='save';Settings=$snapshot.Settings}
 if ($saved.Settings.BrightnessLinkCalibration.SourceId -ne $calibration.SourceId -or
     $saved.Settings.BrightnessLinkCalibration.TargetId -ne $calibration.TargetId) { throw '核心没有保存校准结果。' }
 $saved.Displays | Select-Object Name, Brightness, Kelvin, BacklightTarget, Error | Format-Table -AutoSize
