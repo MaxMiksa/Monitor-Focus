@@ -73,7 +73,7 @@ func NewNativeBackend(writes bool, roots ...string) (*NativeBackend, error) {
 	}
 	if len(n.settings.Scenes) == 0 {
 		states := n.snapshotStates()
-		n.settings.Scenes = domain.DefaultScenes(n.settings, states, [3]string{"default-day", "default-night", "default-focus"})
+		n.settings.Scenes = domain.DefaultScenes(n.settings, states, [4]string{"default-morning", "default-midday", "default-dusk", "default-night"})
 	}
 	n.lastTopology, _ = win32.DisplaySignature()
 	n.lastTopologyAt = time.Now()

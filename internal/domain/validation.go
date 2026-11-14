@@ -23,6 +23,9 @@ func Validate(s Settings) error {
 	if s.FocusDelaySeconds < 0 || s.FocusDelaySeconds > 600 {
 		return fmt.Errorf("focus delay must be 0–600 seconds")
 	}
+	if v := s.ScheduleTransitionMinutes; v != nil && (*v < 0 || *v > 1440) {
+		return fmt.Errorf("schedule transition must be 0–1440 minutes")
+	}
 	if err := validateBinding(s.Linked, s.LinkWeights); err != nil {
 		return err
 	}

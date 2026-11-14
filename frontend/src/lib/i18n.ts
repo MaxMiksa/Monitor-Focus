@@ -4,7 +4,7 @@ import type { Scene } from './control'
 export type Language = 'system' | 'zh-CN' | 'en'
 export type TextKey = keyof typeof strings
 export type Page = 'displays' | 'scenes' | 'schedule' | 'focus' | 'general'
-export const pageLabels: Record<Page, TextKey> = { displays: '显示器', scenes: '场景', schedule: '时间计划', focus: '专注', general: '通用' }
+export const pageLabels: Record<Page, TextKey> = { displays: '当下', scenes: '场景', schedule: '渐变', focus: '专注', general: '通用' }
 export function resolveLanguage(language: Language, system = navigator.language): 'zh-CN' | 'en' {
   return language === 'system' ? (system.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en') : language
 }

@@ -53,7 +53,7 @@ React/TypeScript → Wails 桥 → Go 宿主 / dispatcher
 - 正式配置：`%LOCALAPPDATA%/Monitors-Focus-Go/native-settings.json`；颜色 journal 为同目录 `native-colors.json`；trace 为 `host-native.jsonl`，同一 Trace ID 贯穿界面接收、排队、硬件工作和回复。
 - `domain.Store` 需要显式路径，读取不创建文件；坏文件、未知 schema、非普通文件和权限错误直接返回，不用默认值覆盖。保存比较 `Revision`，仅在成功时递增并返回新副本，使用同目录同步临时文件和原子替换，保留上一版 `.bak`；冲突保留调用方草稿，清理临时文件。锁文件残留须人工核对，不自动夺取。
 - 显式迁移只继承已验证的旧版语言、专注延迟和自启偏好；先备份原始字节再首次写入，保留源文件。读取、迁移或核心初始化失败时，绝不按默认设置改动登录自启。
-- 场景在 `Targets` 之外保存行为字段；旧场景只在内存补齐，不立即改写磁盘。计划按本地时钟求值，跨午夜连续；节点行为只应用一次，渐变期间不重复保存或重置专注。无关保存保留手动保持；行为已变化但持久化失败时不能接受返回状态为已提交。
+- 场景在 `Targets` 之外保存行为字段；旧场景只在内存补齐，不立即改写磁盘。可选 `ScheduleTransitionMinutes` 仅保存统一时长偏好（包括空计划），编辑时同步各节点，旧配置不迁移覆盖；计划仍按节点时长和本地时钟求值，跨午夜连续；节点行为只应用一次，渐变期间不重复保存或重置专注。无关保存保留手动保持；行为已变化但持久化失败时不能接受返回状态为已提交。
 - `startup` 只在配置成功加载／校验后由正式宿主显式调用，维护唯一 `HKCU MonitorsFocus` 项并清理历史别名；操作前快照、逐项读回、失败按相反顺序恢复，保留其他应用条目与已有启用字节。
 - 正常退出保留最新正常亮度，卸载输入钩子与遮罩，撤回补光并恢复原色；非正式的原生硬件验收模式恢复到接管前现场；mock 只读写独立模拟配置，不接管硬件。不要让两个会写硬件的核心同时运行。
 
@@ -66,8 +66,16 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 ## 前端与界面
 
 - `frontend/src/index.css` 是唯一视觉参数入口；组件复用 shadcn 风格控件、Lucide 图标和 Motion 短反馈。重大界面改动先生成效果图并取得确认，再用与当前源码一致的真实截图核对。
+- 快捷面板与设置页共用 960 × 540 DIP 的 16:9 客户区；`window_ratio_windows.go` 用 `WM_SIZING` 和窗口尺寸事件锁定比例，`main.go` 在首次显示及系统贴靠／最大化后恢复并居中。`resizePanel` 仅保留兼容动作，不再切换窗口尺寸。
+- `frontend/public/scenes/` 保存当前版早 / 中 / 傍晚 / 夜四张无文字、无组件的整页 16:9 原创 WebP；`frontend/public/scenes/live/` 保存新版同机位四张 WebP 和一张灰度权重 WebP。仅供开发使用的四张高清 PNG、v7 权重图和 `scene-motion-prototype.html` 留在 `frontend/public/`，Vite 构建结束阶段由 `excludeDevelopmentAssets` 插件从 `frontend/dist` 删除，不进入 exe。正式构建只嵌入场景资源；运行时不请求远程图片或视频，不引入视频解码依赖。真实控件由 React 绘制，避免图片中的按钮与可操作热区错位。
+- 新版舞台的 `LiveSceneStage` 默认启用，「设置 → 通用 → 主界面样式」可切回当前版；偏好存于 `localStorage` 并由 `storage` 事件同步，不进入 Go `Settings`、不改 Revision 或配置迁移。常态仅一张全尺寸画面、一张权重图、一张 128×128 单通道噪声纹理和一张 640×320 飞絮天空补片图集；切换时临时多一张目标画面，完成后直接交换并释放旧纹理，不再重复上传。隐藏、减少动态效果时停止循环；WebGL 初始化失败释放上下文并按当前场景显示原始静态图。
+- 飞絮由 `scripts/export-seed-patches.py` 离线制作局部补片，输出 `frontend/public/scenes/live/seed-sky-patches.png` 与 `frontend/src/lib/seed-patches.json`。不改原始 WebP；同一片元程序先补原位置，再从原图减去补片，搬移有符号细节，避免蓝色矩形边缘。10 个偏移量每次绘制计算一次，复用 80 字节数组，不逐像素算轨迹；独立 120 秒无缝时钟，不随场景切换重置。图集 RGB 上传数据 600 KiB，驱动实际内存另测；生成过程只依赖开发机 Python／Pillow／NumPy／OpenCV，产品不依赖它们。
+- 快捷面板的四颗按钮按场景名称显式映射早 / 中 / 傍晚 / 夜，不按目标小时就近取场景；无法识别的名称才按亮度兜底。浏览器示例数据与每日计划同步使用四个场景和四个节点。亮度滑条左端月亮、右端太阳，表示从暗到亮；更多控制只列出未映射到四颗按钮的场景。
 - 前端通过 Wails runtime 发送请求并等待 `monitor-focus-reply`；示例数据只在明确 `?preview=1` 的浏览器预览中出现，硬件请求失败不回退成演示成功。
-- 设置页共享草稿、撤销／重做和保存提示；状态推送不抢焦点或重置正在编辑的输入。错误、连接、检测、来源和保存结果常驻可见。
+- `@fontsource-variable/noto-sans` 与 `noto-sans-sc` 提供离线可变字体，通过 index.css 的 @import 与全局 --font-sans 应用于文字、表单及图表。Unicode 分片 WOFF2 随 Vite 构建嵌入，只加载所需字形片；不请求远程字体。OFL 完整许可合入项目及分发 notices。
+- 品牌图形源为 `frontend/public/favicon.svg`（Lucide Sun–Moon，许可见 `THIRD_PARTY_NOTICES.md`，分发副本嵌入 `frontend/public/third-party-notices.txt`）。更改 SVG 后运行 `D:/Apps/python/python.exe scripts/export-icons.py`，用本机 CairoSVG/Pillow 派生透明底黑／白 ICO；普通构建无需 Python。`scripts/Set-ExecutableIcon.ps1` 在打包前写入 exe 的两组图标资源；`window_icon_windows.go` 按系统深浅色设置窗口大小图标和托盘图标。Windows 的 Wails `App.SetIcon` 实现为空，不能用它代替资源和 `WM_SETICON`。
+- `settings-editor.tsx` 是始终挂载的首页玻璃浮层，五个底部分类（当下默认）共享 `lib/settings-history.ts` 的草稿和历史。500 ms 防抖、串行保存、Revision 校验；稳定排序的内容指纹避免 Go/JS 字段顺序引起重复保存。保存期间的新改动继续排队，失败保留草稿；撤销／重做（含本地外观偏好）同样保存。Esc 关闭和首页场景请求先 flush，失败重新展开浮层。状态推送不抢焦点或覆盖未保存内容。
+- 窗口为 frameless，无顶部窗口栏；保留顶部 28px 隐形拖动区。设置浮层由胶囊向上裁切展开，无向下箭头，顶部不留操作行；重新检测与「已自动保存」及变化图标位于底栏左侧，五导航保持场景胶囊同位同宽，历史图标组独立靠右。首页方向键／WASD 切场景与展开；浮层内切分类，↓ / S 收起；Esc 收起后再按通过既有 `window-close` 销毁面板并保留托盘核心。输入控件、组合输入和已处理的按键不被全局导航劫持。
 
 ## 开发验收原则
 

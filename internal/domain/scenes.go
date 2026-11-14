@@ -61,11 +61,11 @@ func CaptureScene(s Settings, id, name string, targets map[string]DisplayTarget)
 // DefaultScenes requires measured current display state; it never invents user
 // brightnesses or ships a personal device-pair/temperature curve. IDs are supplied
 // so the function stays pure; call only when the host finds no saved scenes.
-func DefaultScenes(s Settings, displays []DisplayState, ids [3]string) []Scene {
-	names := [3]string{"日常", "夜间", "专注"}
-	factors := [3]float64{1, 0.5, 0.7}
-	values := [3]int{6500, 3200, 4500}
-	scenes := make([]Scene, 3)
+func DefaultScenes(s Settings, displays []DisplayState, ids [4]string) []Scene {
+	names := [4]string{"早晨", "中午", "傍晚", "夜间"}
+	factors := [4]float64{0.8, 1, 0.6, 0.4}
+	values := [4]int{5600, 6500, 4600, 3200}
+	scenes := make([]Scene, 4)
 	for i, name := range names {
 		targets := map[string]DisplayTarget{}
 		for _, d := range displays {

@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>场景换光 · 空气层小样</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #07101d; }
+    .stage { position: fixed; inset: 0; overflow: hidden; background: #07101d; isolation: isolate; }
+    #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #07101d; }
+    .hint {
+      position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 5;
+      display: flex; gap: 6px; padding: 6px; border-radius: 999px;
+      background: rgba(10, 17, 23, .26); border: 1px solid rgba(255, 255, 255, .18);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, .18);
+    }
+    .hint button {
+      border: 0; color: rgba(255, 255, 255, .78); background: transparent; cursor: pointer;
+      font: 500 12px/1 system-ui, sans-serif; padding: 9px 13px; border-radius: 999px;
+      transition: background 200ms ease, color 200ms ease;
+    }
+    .hint button:hover { background: rgba(255, 255, 255, .12); }
+    .hint button.active { background: rgba(255, 255, 255, .9); color: #17202a; }
+    .hint button.tour { color: rgba(255, 244, 214, .9); border-left: 1px solid rgba(255,255,255,.16); border-radius: 0 999px 999px 0; }
+    .status {
+      position: absolute; left: 18px; bottom: 18px; z-index: 5; color: rgba(255,255,255,.65);
+      font: 500 11px/1.4 system-ui, sans-serif; letter-spacing: .04em; pointer-events: none;
+    }
+    .settings {
+      position: absolute; right: 18px; top: 18px; z-index: 6;
+      display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+      font: 500 11px/1.4 system-ui, sans-serif; color: rgba(255,255,255,.78);
+    }
+    .settings > button {
+      border: 1px solid rgba(255,255,255,.18); color: rgba(255,255,255,.78);
+      background: rgba(10,17,23,.26); cursor: pointer; padding: 7px 11px;
+      border-radius: 999px; font: inherit;
+    }
+    .settings-panel {
+      width: 190px; padding: 12px 14px; border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.18); background: rgba(10,17,23,.44);
+      box-shadow: 0 10px 32px rgba(0,0,0,.18);
+    }
+    .settings-panel[hidden] { display: none; }
+    .settings-row { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+    .settings-panel input { width: 100%; accent-color: #dce8ff; cursor: pointer; }
+    .settings-range { display: flex; justify-content: space-between; color: rgba(255,255,255,.46); font-size: 10px; }
+    .clean .hint, .clean .status, .clean .settings { display: none; }
+    @media (prefers-reduced-motion: reduce) { .hint button { transition: none; } }
+  </style>
+</head>
+<body>
+  <main class="stage" id="stage">
+    <canvas id="scene" aria-label="四场景实时换光与空气层预览"></canvas>
+    <nav class="hint" aria-label="场景预览">
+      <button class="active" type="button" data-scene="morning">早晨</button>
+      <button type="button" data-scene="midday">中午</button>
+      <button type="button" data-scene="dusk">傍晚</button>
+      <button type="button" data-scene="night">夜间</button>
+      <button class="tour" id="tour" type="button" aria-label="按早晨、中午、傍晚、夜间、早晨自动巡演">巡演</button>
+    </nav>
+    <div class="status" id="status">载入场景…</div>
+    <div class="settings">
+      <button id="settings-toggle" type="button" aria-expanded="false" aria-controls="settings-panel">设置</button>
+      <div class="settings-panel" id="settings-panel" hidden>
+        <div class="settings-row"><label for="air-opacity">空气透明度</label><output id="air-opacity-value" for="air-opacity">8%</output></div>
+        <input id="air-opacity" type="range" min="5" max="12" step="1" value="8" />
+        <div class="settings-range"><span>更隐</span><span>更显</span></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const IMAGE_WIDTH = 1672;
+    const IMAGE_HEIGHT = 941;
+    const DURATION = 1750;
+    const TOUR_HOLD = 2700;
+    const MAX_FPS = 30;
+    const DPR_CAP = 1.25;
+    const NOISE_SIZE = 128;
+    const TAU = Math.PI * 2;
+    const params = new URLSearchParams(location.search);
+    if (params.get('clean') === '1') document.body.classList.add('clean');
+
+    const sceneOrder = ['morning', 'midday', 'dusk', 'night'];
+    const sceneLabel = { morning: '早晨', midday: '中午', dusk: '傍晚', night: '夜间' };
+    const sources = {
+      morning: '/scene-morning-machine-clean-v1.png',
+      midday: '/aligned-midday-machine-clean-v1.png',
+      dusk: '/aligned-dusk-machine-clean-v1.png',
+      night: '/aligned-night-machine-clean-v1.png',
+    };
+    // Shape never changes with the scene. Only tint, gain, density and stars follow the sky.
+    // The cycle length eases to its new value without resetting the shared air phase.
+    const profiles = {
+      morning: { period: 40, idleFps: 18, density: .080, stars: 0, gain: .96, gold: .06, tint: [1.00, .91, .76] },
+      midday:  { period: 30, idleFps: 24, density: .105, stars: 0, gain: 1.05, gold: .02, tint: [.88, .95, 1.00] },
+      dusk:    { period: 60, idleFps: 14, density: .068, stars: 0, gain: .92, gold: .32, tint: [1.00, .80, .56] },
+      night:   { period: 90, idleFps: 10, density: 0, stars: .86, gain: .50, gold: 0, tint: [.36, .50, .80] },
+    };
+
+    const canvas = document.getElementById('scene');
+    const status = document.getElementById('status');
+    const gl = canvas.getContext('webgl', {
+      alpha: false, antialias: false, depth: false, stencil: false,
+      premultipliedAlpha: false, preserveDrawingBuffer: false,
+      powerPreference: 'low-power',
+    });
+    if (!gl) throw new Error('WebGL 不可用');
+
+    const vertexShader = `
+      attribute vec2 position;
+      varying vec2 uv;
+      void main() {
+        uv = vec2(position.x * .5 + .5, .5 - position.y * .5);
+        gl_Position = vec4(position, 0.0, 1.0);
+      }
+    `;
+
+    // Existing region rewrite stays untouched. The air layer is composited only after it.
+    const fragmentShader = `
+      #ifdef GL_FRAGMENT_PRECISION_HIGH
+      precision highp float;
+      #else
+      precision mediump float;
+      #endif
+      uniform sampler2D fromFrame;
+      uniform sampler2D toFrame;
+      uniform sampler2D regionMask;
+      uniform sampler2D airNoise;
+      uniform float progress;
+      uniform float direction;
+      uniform float airPhase;
+      uniform vec2 coverScale;
+      uniform vec2 coverOffset;
+      uniform vec4 airFrom;
+      uniform vec4 airTo;
+      uniform vec3 tintFrom;
+      uniform vec3 tintTo;
+      uniform float airOpacity;
+      varying vec2 uv;
+
+      float ease(float x) { return x * x * (3.0 - 2.0 * x); }
+      float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+      // Every temporal term is an integer harmonic of airPhase, so one cycle closes exactly.
+      float veilLayer(vec2 p, float phase, float seed, float harmonic) {
+        float a = phase * harmonic + seed;
+        vec2 orbit = vec2(sin(a), cos(a + seed * .31)) * .035;
+        vec2 warpUv = p * .43 + vec2(.17 + seed * .07, .61 - seed * .05) + orbit * .45;
+        vec2 warp = vec2(
+          texture2D(airNoise, warpUv).r,
+          texture2D(airNoise, warpUv + vec2(.27, .43) - orbit * .30).r
+        ) - .5;
+        float stretch = 1.0 + .13 * sin(a + 1.1);
+        float gather = .38 + .13 * sin(a * 2.0 + seed) + .07 * cos(a + p.x * 3.1);
+        vec2 q = (p + warp * (.14 + .060 * sin(a * 3.0))) * stretch + orbit;
+        float n = texture2D(airNoise, q).r;
+        float shape = smoothstep(gather, gather + .44, n);
+        float veil = .30 + .70 * smoothstep(.08, .72, shape);
+        float transmittance = .74 + .26 * sin(phase * (harmonic + 2.0) + p.x * 4.0 + p.y * 6.0 + seed);
+        float dissolve = .76 + .24 * sin(phase * (harmonic + 1.0) + p.y * 2.2 - seed);
+        return veil * transmittance * dissolve;
+      }
+
+      float starAt(vec2 p, float phase) {
+        vec2 grid = vec2(29.0, 16.0);
+        vec2 cell = floor(p * grid);
+        vec2 f = fract(p * grid);
+        float a = hash21(cell + vec2(11.3, 7.1));
+        float b = hash21(cell + vec2(41.7, 23.9));
+        float c = hash21(cell + vec2(83.2, 61.4));
+        vec2 center = vec2(.18 + .64 * a, .18 + .64 * b);
+        float d = length((f - center) * vec2(1.15, 1.0));
+        float exists = step(.958, c);
+        float point = exp(-d * d * 280.0);
+        float twinkle = .78 + .22 * sin(phase * 2.0 + a * 6.2831853);
+        return point * exists * twinkle;
+      }
+
+      void main() {
+        vec2 imageUv = clamp(uv * coverScale + coverOffset, 0.0, 1.0);
+        vec3 fromColor = texture2D(fromFrame, imageUv).rgb;
+        vec3 toColor = texture2D(toFrame, imageUv).rgb;
+        float difference = length(toColor - fromColor) / 1.732;
+        float region = texture2D(regionMask, imageUv).r;
+        float detail = difference * .28;
+        float weight = clamp((progress - (1.0 - region) * .46 - (1.0 - detail) * .10) / .42, 0.0, 1.0);
+        float soft = ease(weight);
+        float phase = mix(-1.0, 1.0, step(0.0, direction));
+        float lightPulse = sin((imageUv.y * 5.0 + imageUv.x * 1.4 + phase * progress * 2.4) * 3.14159) * .022
+          * sin(progress * 3.14159) * difference;
+        soft = clamp(soft + lightPulse, 0.0, 1.0);
+        vec3 color = mix(fromColor, toColor, soft);
+
+        float airBlend = ease(clamp((progress - .035) / .58, 0.0, 1.0));
+        vec4 air = mix(airFrom, airTo, airBlend);
+        air.x = airOpacity;
+        vec3 tint = mix(tintFrom, tintTo, airBlend);
+
+        float side = abs((imageUv.x - .5) * 2.0);
+        float horizon = .655 + .066 * pow(side, 1.45);
+        float sky = 1.0 - smoothstep(horizon - .20, horizon + .006, imageUv.y);
+        float centerCalm = exp(-pow((imageUv.x - .5) / .205, 2.0) - pow((imageUv.y - .545) / .235, 2.0));
+        float seedCalm = exp(-pow((imageUv.y - .615) / .115, 2.0)) * (1.0 - smoothstep(.10, .55, abs(imageUv.x - .5)));
+        float luma = dot(color, vec3(.2126, .7152, .0722));
+        float brightGuard = 1.0 - .72 * smoothstep(.70, .95, luma);
+        float area = sky * brightGuard * (1.0 - .70 * centerCalm) * (1.0 - .30 * seedCalm);
+
+        vec2 p1 = vec2(imageUv.x * 1.42 + imageUv.y * .31, imageUv.y * 5.8 - imageUv.x * .18) + vec2(.12, .27);
+        vec2 p2 = mat2(.93, -.36, .36, .93) * vec2(imageUv.x * 2.15 - imageUv.y * .44, imageUv.y * 8.0 + imageUv.x * .26) + vec2(.47, .13);
+        vec2 p3 = mat2(.80, .60, -.60, .80) * vec2(imageUv.x * 2.85 + imageUv.y * .55, imageUv.y * 10.6 - imageUv.x * .33) + vec2(.71, .63);
+        float w1 = veilLayer(p1, airPhase, .7, 1.0);
+        float w2 = veilLayer(p2, airPhase, 2.4, 2.0);
+        float w3 = veilLayer(p3, airPhase, 4.1, 3.0);
+        // A gentle width gain makes the veil spread and regather without changing its seed.
+        float breath = .82 + .30 * (.5 + .5 * sin(airPhase + p1.y * .21))
+          + .07 * sin(airPhase * 2.0 - p2.x * .34);
+        float wisps = clamp((w1 * .46 + w2 * .33 + w3 * .21) * breath, 0.0, 1.0);
+
+        vec3 airColor = mix(color, tint * (.58 + .42 * luma) * air.z, .58);
+        float density = clamp(air.x * area * wisps, 0.0, .12);
+        float softShade = 1.0 - smoothstep(.30, .78, wisps) * .018 * area;
+        color = mix(color * softShade, airColor, density);
+        float goldEdge = area * smoothstep(.15, .55, wisps) * (1.0 - smoothstep(.55, .95, wisps));
+        color += tint * vec3(air.w, air.w * .55, air.w * .12) * goldEdge * .004;
+
+        float starSky = sky * (1.0 - smoothstep(.34, .62, imageUv.y)) * (1.0 - .75 * centerCalm)
+          * smoothstep(.015, .09, imageUv.y);
+        float stars = starAt(imageUv, airPhase) * starSky;
+        color += vec3(.55, .68, .94) * stars * air.y * .055;
+        gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+      }
+    `;
+
+    function makeShader(type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+      return shader;
+    }
+
+    const vs = makeShader(gl.VERTEX_SHADER, vertexShader);
+    const fs = makeShader(gl.FRAGMENT_SHADER, fragmentShader);
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+    gl.deleteShader(vs);
+    gl.deleteShader(fs);
+    gl.useProgram(program);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const position = gl.getAttribLocation(program, 'position');
+    gl.enableVertexAttribArray(position);
+    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+    function makeTexture(unit, image) {
+      const texture = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      if (image) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+      return texture;
+    }
+
+    function seededRandom(seed) {
+      let value = seed >>> 0;
+      return () => {
+        value = (Math.imul(value, 1664525) + 1013904223) >>> 0;
+        return value / 4294967296;
+      };
+    }
+
+    // Small periodic value-noise tile; no image sequence and no runtime blur.
+    function makeNoiseData(size) {
+      const random = seededRandom(20261114);
+      const octaves = [4, 7, 13, 29].map((cells, index) => {
+        const lattice = new Float32Array(cells * cells);
+        for (let i = 0; i < lattice.length; i += 1) lattice[i] = random();
+        return { cells, lattice, weight: [.42, .28, .18, .12][index] };
+      });
+      function sample(octave, x, y) {
+        const cells = octave.cells;
+        const gx = x * cells;
+        const gy = y * cells;
+        const ix = Math.floor(gx);
+        const iy = Math.floor(gy);
+        const tx = gx - ix;
+        const ty = gy - iy;
+        const u = tx * tx * (3 - 2 * tx);
+        const v = ty * ty * (3 - 2 * ty);
+        const x0 = ((ix % cells) + cells) % cells;
+        const y0 = ((iy % cells) + cells) % cells;
+        const x1 = (x0 + 1) % cells;
+        const y1 = (y0 + 1) % cells;
+        const a = octave.lattice[y0 * cells + x0] * (1 - u) + octave.lattice[y0 * cells + x1] * u;
+        const b = octave.lattice[y1 * cells + x0] * (1 - u) + octave.lattice[y1 * cells + x1] * u;
+        return a * (1 - v) + b * v;
+      }
+      const data = new Uint8Array(size * size);
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const nx = (x + .5) / size;
+          const ny = (y + .5) / size;
+          let value = 0;
+          for (const octave of octaves) value += sample(octave, nx, ny) * octave.weight;
+          value = Math.max(0, Math.min(1, .5 + (value - .5) * 1.55));
+          data[y * size + x] = Math.round(value * 255);
+        }
+      }
+      return data;
+    }
+
+    const noiseTexture = gl.createTexture();
+    let noiseUploadBytes = 0;
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    {
+      const noiseData = makeNoiseData(NOISE_SIZE);
+      noiseUploadBytes = noiseData.byteLength;
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, NOISE_SIZE, NOISE_SIZE, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, noiseData);
+      if (gl.getError() !== gl.NO_ERROR) throw new Error('云纹纹理上传失败');
+    }
+
+    const uniforms = {
+      from: gl.getUniformLocation(program, 'fromFrame'),
+      to: gl.getUniformLocation(program, 'toFrame'),
+      mask: gl.getUniformLocation(program, 'regionMask'),
+      noise: gl.getUniformLocation(program, 'airNoise'),
+      progress: gl.getUniformLocation(program, 'progress'),
+      direction: gl.getUniformLocation(program, 'direction'),
+      phase: gl.getUniformLocation(program, 'airPhase'),
+      coverScale: gl.getUniformLocation(program, 'coverScale'),
+      coverOffset: gl.getUniformLocation(program, 'coverOffset'),
+      airFrom: gl.getUniformLocation(program, 'airFrom'),
+      airTo: gl.getUniformLocation(program, 'airTo'),
+      tintFrom: gl.getUniformLocation(program, 'tintFrom'),
+      tintTo: gl.getUniformLocation(program, 'tintTo'),
+      opacity: gl.getUniformLocation(program, 'airOpacity'),
+    };
+    gl.uniform1i(uniforms.from, 0);
+    gl.uniform1i(uniforms.to, 1);
+    gl.uniform1i(uniforms.mask, 2);
+    gl.uniform1i(uniforms.noise, 3);
+    gl.uniform1f(uniforms.direction, 1);
+
+    const frameTextures = [makeTexture(0), makeTexture(1)];
+    const maskTexture = makeTexture(2);
+    const frames = {};
+    const requestedScene = params.get('scene');
+    let current = sceneOrder.includes(requestedScene) ? requestedScene : 'morning';
+    let fromProfile = profiles[current];
+    let toProfile = profiles[current];
+    let progress = 1;
+    let transitioning = false;
+    let transitionStart = 0;
+    const phaseParam = Number(params.get('phase'));
+    let airPhase = Number.isFinite(phaseParam) ? ((phaseParam % TAU) + TAU) % TAU : .62;
+    let periodNow = profiles[current].period;
+    let periodTarget = periodNow;
+    let lastTick = 0;
+    let lastRender = 0;
+    let measuredFps = 0;
+    let rafId = 0;
+    let disposed = false;
+    let tourTimer = 0;
+    let tourIndex = 0;
+    let tourActive = false;
+    const frozen = params.get('freeze') === '1';
+    const opacityInput = document.getElementById('air-opacity');
+    const opacityValue = document.getElementById('air-opacity-value');
+    const opacityQuery = Number(params.get('opacity'));
+    let airOpacity = params.has('opacity') && Number.isFinite(opacityQuery)
+      ? Math.max(.05, Math.min(.12, opacityQuery / 100))
+      : .08;
+    window.__airPreview = { setFromScene(name) {
+      if (!frames[name]) return;
+      uploadFrame(0, name);
+      uploadFrame(1, current);
+      fromProfile = profiles[name];
+      toProfile = profiles[current];
+      setAirProfiles(fromProfile, toProfile);
+      gl.uniform1f(uniforms.direction, sceneOrder.indexOf(current) > sceneOrder.indexOf(name) ? 1 : -1);
+      render();
+    }, setPhase(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return;
+      airPhase = ((numeric % TAU) + TAU) % TAU;
+      render();
+    } };
+    const reducedQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let reducedMotion = reducedQuery.matches;
+
+    function isPaused() { return reducedMotion || document.hidden || frozen || disposed; }
+
+    function resize() {
+      const ratio = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+      const width = Math.round(canvas.clientWidth * ratio);
+      const height = Math.round(canvas.clientHeight * ratio);
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+        gl.viewport(0, 0, width, height);
+      }
+      const imageAspect = IMAGE_WIDTH / IMAGE_HEIGHT;
+      const viewAspect = width / height;
+      let scaleX = 1;
+      let scaleY = 1;
+      if (viewAspect > imageAspect) scaleY = imageAspect / viewAspect;
+      else scaleX = viewAspect / imageAspect;
+      gl.uniform2f(uniforms.coverScale, scaleX, scaleY);
+      gl.uniform2f(uniforms.coverOffset, (1 - scaleX) * .5, (1 - scaleY) * .5);
+    }
+
+    function setAirProfiles(from, to) {
+      gl.uniform4f(uniforms.airFrom, from.density, from.stars, from.gain, from.gold);
+      gl.uniform4f(uniforms.airTo, to.density, to.stars, to.gain, to.gold);
+      gl.uniform3fv(uniforms.tintFrom, from.tint);
+      gl.uniform3fv(uniforms.tintTo, to.tint);
+    }
+
+    function render() {
+      if (disposed) return;
+      resize();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, frameTextures[0]);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, frameTextures[1]);
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, maskTexture);
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, noiseTexture);
+      gl.uniform1f(uniforms.progress, progress);
+      gl.uniform1f(uniforms.phase, airPhase);
+      gl.uniform1f(uniforms.opacity, airOpacity);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+
+    function uploadFrame(unit, name) {
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, frameTextures[unit]);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, frames[name]);
+    }
+
+    function loadImage(url) {
+      return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.decoding = 'async';
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error(url));
+        image.src = url;
+      });
+    }
+
+    function setActiveButton(name) {
+      document.querySelectorAll('.hint button[data-scene]').forEach(button => {
+        button.classList.toggle('active', button.dataset.scene === name);
+      });
+    }
+
+    function targetFps() {
+      return Math.min(MAX_FPS, transitioning ? MAX_FPS : profiles[current].idleFps);
+    }
+
+    function tick(now) {
+      if (isPaused()) { rafId = 0; return; }
+      const dt = Math.min((now - lastTick) / 1000, .2);
+      lastTick = now;
+      periodNow += (periodTarget - periodNow) * (1 - Math.exp(-dt / .45));
+      airPhase = (airPhase + dt * TAU / periodNow) % TAU;
+      if (transitioning) {
+        progress = Math.min((now - transitionStart) / DURATION, 1);
+        if (progress >= 1) {
+          transitioning = false;
+          fromProfile = toProfile;
+          status.textContent = `当前场景 · ${sceneLabel[current]}`;
+        }
+      }
+      const interval = 1000 / targetFps();
+      if (now - lastRender >= interval - 1) {
+        if (lastRender) measuredFps = 1000 / Math.max(now - lastRender, 1);
+        lastRender = now;
+        render();
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    function startLoop() {
+      if (rafId || isPaused()) return;
+      lastTick = performance.now();
+      lastRender = 0;
+      rafId = requestAnimationFrame(tick);
+    }
+
+    function stopLoop() {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+
+    function switchScene(name) {
+      if (name === current || transitioning || !frames[name] || disposed) return false;
+      const previous = current;
+      uploadFrame(0, previous);
+      uploadFrame(1, name);
+      fromProfile = profiles[previous];
+      toProfile = profiles[name];
+      setAirProfiles(fromProfile, toProfile);
+      gl.uniform1f(uniforms.direction, sceneOrder.indexOf(name) > sceneOrder.indexOf(previous) ? 1 : -1);
+      periodTarget = profiles[name].period;
+      current = name;
+      setActiveButton(name);
+      if (isPaused()) {
+        periodNow = periodTarget;
+        progress = 1;
+        fromProfile = toProfile;
+        setAirProfiles(toProfile, toProfile);
+        render();
+        status.textContent = `当前场景 · ${sceneLabel[name]}`;
+        return true;
+      }
+      transitioning = true;
+      transitionStart = performance.now();
+      progress = 0;
+      status.textContent = `光线改写中 · ${sceneLabel[name]}`;
+      render();
+      startLoop();
+      return true;
+    }
+
+    function stopTour() {
+      tourActive = false;
+      if (tourTimer) clearTimeout(tourTimer);
+      tourTimer = 0;
+      document.getElementById('tour').classList.remove('active');
+    }
+
+    function startTour() {
+      stopTour();
+      const order = ['midday', 'dusk', 'night', 'morning'];
+      tourActive = true;
+      tourIndex = 0;
+      document.getElementById('tour').classList.add('active');
+      switchScene('morning');
+      status.textContent = '巡演 · 早晨';
+      const advance = () => {
+        if (!tourActive || disposed) return;
+        tourIndex += 1;
+        if (tourIndex >= order.length) {
+          stopTour();
+          status.textContent = `巡演完成 · ${sceneLabel[current]}`;
+          return;
+        }
+        switchScene(order[tourIndex]);
+        status.textContent = `巡演 · ${sceneLabel[order[tourIndex]]}`;
+        tourTimer = setTimeout(advance, DURATION + TOUR_HOLD);
+      };
+      tourTimer = setTimeout(advance, TOUR_HOLD);
+    }
+
+    function updateMotionPreference() {
+      reducedMotion = reducedQuery.matches;
+      if (isPaused()) {
+        stopLoop();
+        if (!document.hidden && !disposed) render();
+      } else {
+        startLoop();
+      }
+    }
+
+    function dispose() {
+      if (disposed) return;
+      disposed = true;
+      stopTour();
+      stopLoop();
+      if (!gl.isContextLost()) {
+        gl.deleteTexture(frameTextures[0]);
+        gl.deleteTexture(frameTextures[1]);
+        gl.deleteTexture(maskTexture);
+        gl.deleteTexture(noiseTexture);
+        gl.deleteBuffer(buffer);
+        gl.deleteProgram(program);
+      }
+    }
+
+    document.querySelectorAll('.hint button[data-scene]').forEach(button => {
+      button.addEventListener('click', () => {
+        stopTour();
+        switchScene(button.dataset.scene);
+      });
+    });
+    document.getElementById('tour').addEventListener('click', startTour);
+    document.getElementById('settings-toggle').addEventListener('click', () => {
+      const panel = document.getElementById('settings-panel');
+      panel.hidden = !panel.hidden;
+      document.getElementById('settings-toggle').setAttribute('aria-expanded', String(!panel.hidden));
+    });
+    opacityInput.value = String(Math.round(airOpacity * 100));
+    opacityValue.value = `${Math.round(airOpacity * 100)}%`;
+    opacityInput.addEventListener('input', () => {
+      airOpacity = Number(opacityInput.value) / 100;
+      opacityValue.value = `${opacityInput.value}%`;
+      render();
+    });
+    window.addEventListener('resize', render, { passive: true });
+    reducedQuery.addEventListener('change', updateMotionPreference);
+    document.addEventListener('visibilitychange', updateMotionPreference);
+    window.addEventListener('pagehide', dispose, { once: true });
+
+    Object.assign(window.__airPreview, {
+      setScene: switchScene,
+      setTransitionProgress(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return;
+        progress = Math.max(0, Math.min(1, numeric));
+        transitioning = progress < 1;
+        render();
+      },
+      setPhase(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return;
+        airPhase = ((numeric % TAU) + TAU) % TAU;
+        render();
+      },
+      startTour,
+      stopTour,
+      stats: () => ({
+        scene: current,
+        noiseUploadBytes,
+        noiseSize: [NOISE_SIZE, NOISE_SIZE],
+        drawingBuffer: [gl.drawingBufferWidth, gl.drawingBufferHeight],
+        dprCap: DPR_CAP,
+        fpsCap: MAX_FPS,
+        airOpacity: Number(airOpacity.toFixed(3)),
+        idleFps: profiles[current].idleFps,
+        measuredFps: Number(measuredFps.toFixed(2)),
+        phase: airPhase,
+        periodSeconds: Number(periodNow.toFixed(2)),
+        paused: isPaused(),
+        reducedMotion,
+        transitioning,
+      }),
+
+    });
+
+    async function init() {
+      const entries = await Promise.all(Object.entries(sources).map(async ([key, url]) => [key, await loadImage(url)]));
+      for (const [key, image] of entries) frames[key] = image;
+      const mask = await loadImage('/scene-morph-mask-v7.png');
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, maskTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, mask);
+      uploadFrame(0, current);
+      uploadFrame(1, current);
+      setActiveButton(current);
+      setAirProfiles(profiles[current], profiles[current]);
+      render();
+      status.textContent = `当前场景 · ${sceneLabel[current]}`;
+      gl.uniform1f(uniforms.opacity, airOpacity);
+      if (isPaused()) render();
+      else startLoop();
+      if (params.get('tour') === '1') startTour();
+    }
+
+    init().catch(error => {
+      status.textContent = `载入失败：${error.message}`;
+      console.error(error);
+    });
+  </script>
+</body>
+</html>

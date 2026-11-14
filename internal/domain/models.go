@@ -27,6 +27,7 @@ type Settings struct {
 	KeepSecondaryAwakeOnFullscreen    bool
 	FocusDelaySeconds                 int
 	ScheduleEnabled                   bool
+	ScheduleTransitionMinutes         *int `json:",omitempty"`
 	LaunchOnStartup                   bool
 	TopEdgeBrightnessEnabled          bool
 	BottomEdgeVolumeEnabled           bool
@@ -212,6 +213,12 @@ func SceneName(scene Scene, preference, systemLanguage string) string {
 	switch scene.Name {
 	case "日常":
 		return "Day"
+	case "早晨":
+		return "Morning"
+	case "中午":
+		return "Midday"
+	case "傍晚":
+		return "Dusk"
 	case "夜间":
 		return "Night"
 	case "专注":
@@ -222,6 +229,7 @@ func SceneName(scene Scene, preference, systemLanguage string) string {
 
 // Clone makes an independent draft, including pointers and nil/empty selections.
 func (s Settings) Clone() Settings {
+	s.ScheduleTransitionMinutes = clonePointer(s.ScheduleTransitionMinutes)
 	s.LinkWeights = maps.Clone(s.LinkWeights)
 	s.ControlledDisplayIds = slices.Clone(s.ControlledDisplayIds)
 	if s.BrightnessLinkCalibration != nil {

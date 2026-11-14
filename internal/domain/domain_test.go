@@ -424,11 +424,12 @@ func TestSceneDefaultsPlanIdentityAndIsolation(t *testing.T) {
 	if !b.Equal(other) {
 		t.Fatal("focus list order should not affect rules")
 	}
-	defaults := DefaultScenes(s, []DisplayState{{Id: "real", Brightness: 61, CanAdjustColor: true}}, [3]string{"one", "two", "three"})
-	requireEqual(t, defaults[1].Targets["real"].Brightness, 30)
-	requireEqual(t, defaults[2].Behavior.FocusEnabled, true)
+	defaults := DefaultScenes(s, []DisplayState{{Id: "real", Brightness: 61, CanAdjustColor: true}}, [4]string{"one", "two", "three", "four"})
+	requireEqual(t, defaults[1].Targets["real"].Brightness, 61)
+	requireEqual(t, defaults[3].Targets["real"].Brightness, 24)
+	requireEqual(t, defaults[0].Name, "早晨")
 	defaults[0].Targets["real"] = DisplayTarget{Brightness: 1}
-	requireEqual(t, defaults[1].Targets["real"].Brightness, 30)
+	requireEqual(t, defaults[1].Targets["real"].Brightness, 61)
 	before, _ := json.Marshal(s)
 	copy := s.Clone()
 	*copy.Scenes[1].Targets["a"].Kelvin = 4000

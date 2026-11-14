@@ -30,6 +30,9 @@ var assets embed.FS
 //go:embed frontend/public/app.ico
 var icon []byte
 
+//go:embed frontend/public/app-white.ico
+var whiteIcon []byte
+
 // Set only by the adopted product build. Validation builds remain explicit mock.
 var adoptedBuild string
 
@@ -173,7 +176,7 @@ func main() {
 	host.app = application.New(application.Options{
 		Name: appName, Description: "Windows display controller",
 		Assets:  application.AssetOptions{Handler: handler, DisableLogging: true},
-		Windows: application.WindowsOptions{WndClass: trayWindowClass, DisableQuitOnLastWindowClosed: !*panelOnly, WebviewUserDataPath: filepath.Join(root, "WebView2", *mode), AdditionalBrowserArgs: browserArgs},
+		Windows: application.WindowsOptions{WndClass: trayWindowClass, DisableQuitOnLastWindowClosed: !*panelOnly, WebviewUserDataPath: filepath.Join(root, "WebView2", *mode), AdditionalBrowserArgs: browserArgs, WndProcInterceptor: fixedRatioInterceptor},
 		SingleInstance: &application.SingleInstanceOptions{UniqueID: "MonitorsFocus.Go." + *mode, OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
 			action := "open"
 			for i, arg := range data.Args {
@@ -204,7 +207,7 @@ func main() {
 	})
 	host.app.SetIcon(icon)
 	if !*panelOnly {
-		tray := host.app.SystemTray.New().SetIcon(icon)
+		tray := host.app.SystemTray.New().SetIcon(nativeTrayIcon())
 		menu := host.app.NewMenu()
 		openLabel, closeLabel, exitLabel := "打开实验面板 · "+*mode, "关闭实验面板", "退出实验（保留现用程序）"
 		if *production {
@@ -312,6 +315,9 @@ func (h *Host) control(action string) {
 func (h *Host) open() {
 	application.InvokeSync(func() {
 		if h.window != nil {
+			if h.window.IsMinimised() {
+				h.window.Restore()
+			}
 			h.window.Show()
 			h.window.Focus()
 			return
@@ -324,22 +330,48 @@ func (h *Host) open() {
 		if h.production {
 			title = "Monitors Focus"
 		}
-		w := h.app.Window.NewWithOptions(application.WebviewWindowOptions{Name: fmt.Sprintf("panel-%d", serial), Title: title, Width: 680, Height: 510, MinWidth: 600, MinHeight: 460, URL: url, DevToolsEnabled: h.dev || h.inspect, BackgroundColour: application.NewRGB(247, 249, 252)})
+		w := h.app.Window.NewWithOptions(application.WebviewWindowOptions{Name: fmt.Sprintf("panel-%d", serial), Title: title, Width: 960, Height: 540, URL: url, Frameless: true, DisableResize: false, DevToolsEnabled: h.dev || h.inspect, BackgroundColour: application.NewRGB(247, 249, 252), Windows: application.WindowsWindow{NonClientRegionSupport: true}})
 		h.window = w
+		setFixedRatioWindow(uintptr(w.NativeWindow()))
 		w.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
+			clearFixedRatioWindow(uintptr(w.NativeWindow()))
 			if h.window == w {
 				h.window = nil
 			}
 			h.record("window-closed", map[string]any{"serial": serial})
 		})
 		w.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
-			width, height := win32.ClientOuterSize(uintptr(w.NativeWindow()), 680, 510)
-			w.SetSize(width, height)
+			if err := setPanelIcon(uintptr(w.NativeWindow())); err != nil {
+				h.record("window-icon-error", map[string]any{"error": err.Error()})
+			}
+			applyFixedRatioSize(uintptr(w.NativeWindow()), 960, 540)
 			// STARTUPINFO can hide the first ShowWindow when the tray process was
 			// launched with SW_HIDE. A later user open must explicitly show it.
 			w.Show()
 			w.Focus()
 			h.record("runtime-ready", map[string]any{"serial": serial, "elapsedMs": time.Since(h.opened).Milliseconds()})
+		})
+		// Maximising and Windows snapping bypass WM_SIZING; return to the
+		// one-window 16:9 stage after those system transitions finish.
+		w.OnWindowEvent(events.Windows.WindowDidResize, func(*application.WindowEvent) {
+			application.InvokeAsync(func() {
+				if !isFixedRatioWindow(uintptr(w.NativeWindow())) || w.IsMinimised() {
+					return
+				}
+				hwnd := uintptr(w.NativeWindow())
+				if w.IsMaximised() {
+					w.Restore()
+				}
+				frameX, frameY := windowFrame(hwnd)
+				_, _, _, _, clientWidth, clientHeight := windowMetrics(hwnd, frameX, frameY)
+				// Keep user resizing when its client area is already 16:9.
+				if clientWidth > 0 && clientHeight > 0 && absRatioError(clientWidth, clientHeight) <= 16 {
+					return
+				}
+				// Restore the single 16:9 stage after a snap, maximise or resize.
+				applyFixedRatioSize(hwnd, panelClientWide, panelClientHigh)
+				w.Center()
+			})
 		})
 		h.record("window-created", map[string]any{"serial": serial})
 	})
@@ -358,16 +390,27 @@ func (h *Host) receive(w application.Window, message string, origin *application
 		return
 	}
 	switch msg.Request.Action {
-	case "window":
+	case "window-minimise", "window-maximise", "window-close":
 		application.InvokeAsync(func() {
-			if msg.Request.Value != nil && *msg.Request.Value == 1 {
-				width, height := win32.ClientOuterSize(uintptr(w.NativeWindow()), 1040, 720)
-				w.SetSize(width, height)
-			} else {
-				width, height := win32.ClientOuterSize(uintptr(w.NativeWindow()), 680, 510)
-				w.SetSize(width, height)
+			switch msg.Request.Action {
+			case "window-minimise":
+				w.Minimise()
+			case "window-maximise":
+				// A 16:9 stage has no separate maximised layout. Keep the
+				// button useful by returning a moved/resized window to centre.
+				if w.IsMaximised() {
+					w.Restore()
+				}
+				applyFixedRatioSize(uintptr(w.NativeWindow()), 960, 540)
+				w.Center()
+			case "window-close":
+				w.Close()
 			}
 		})
+		return
+	case "window":
+		// Both pages now share a fixed 16:9 window; recentre on page changes.
+		application.InvokeAsync(func() { w.Center() })
 		return
 	case "ui-ready":
 		h.record("ui-ready", map[string]any{"serial": h.serial, "elapsedMs": time.Since(h.opened).Milliseconds()})

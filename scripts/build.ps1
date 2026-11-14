@@ -28,6 +28,7 @@ try {
     $native=[Diagnostics.Stopwatch]::StartNew()
     & $Go build "-overlay=$overlay" -mod=readonly -trimpath -tags production -ldflags '-s -w -H windowsgui -X main.adoptedBuild=true' -o build/MonitorsFocus.Go.exe .
     if ($LASTEXITCODE) { throw 'Windows production build failed' }
+    & "$PSScriptRoot/Set-ExecutableIcon.ps1" -Executable "$root/build/MonitorsFocus.Go.exe"
     # Verify the stripped executable's writable image section; no symbols needed.
     $stream=[IO.File]::OpenRead((Join-Path $root 'build/MonitorsFocus.Go.exe'))
     try {

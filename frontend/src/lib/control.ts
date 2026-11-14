@@ -7,7 +7,7 @@ export interface PlanPoint { MinuteOfDay: number; SceneId: string; TransitionMin
 export interface TemperatureBrightnessPoint { Kelvin: number; ReferenceBrightness: number; CompensatedBrightness: number }
 export interface BrightnessLinkCalibration { SourceId: string; TargetId: string; Points: { Source: number; Target: number }[] }
 export type EdgeWheelModifier = 'alt' | 'ctrl' | 'shift'
-export interface Settings extends SceneBehavior { SchemaVersion: number; Revision: number; Language: Language; KeepSecondaryAwakeOnFullscreen: boolean; FocusDelaySeconds: number; ScheduleEnabled: boolean; LaunchOnStartup: boolean; TopEdgeBrightnessEnabled: boolean; BottomEdgeVolumeEnabled: boolean; EdgeWheelModifier: EdgeWheelModifier; Scenes: Scene[]; Schedule: PlanPoint[]; TemperatureBrightnessCalibrations?: Record<string, { Points: TemperatureBrightnessPoint[] }>; BrightnessLinkCalibration?: BrightnessLinkCalibration | null }
+export interface Settings extends SceneBehavior { SchemaVersion: number; Revision: number; Language: Language; KeepSecondaryAwakeOnFullscreen: boolean; FocusDelaySeconds: number; ScheduleEnabled: boolean; ScheduleTransitionMinutes?: number; LaunchOnStartup: boolean; TopEdgeBrightnessEnabled: boolean; BottomEdgeVolumeEnabled: boolean; EdgeWheelModifier: EdgeWheelModifier; Scenes: Scene[]; Schedule: PlanPoint[]; TemperatureBrightnessCalibrations?: Record<string, { Points: TemperatureBrightnessPoint[] }>; BrightnessLinkCalibration?: BrightnessLinkCalibration | null }
 export interface Snapshot { Displays: Display[]; Settings: Settings; FocusPaused: boolean; Source: string; Error: string | null; Warning?: string | null; SystemLanguage?: string | null }
 export interface Request { Action: string; Id?: string; Value?: number; Settings?: Settings }
 
@@ -47,16 +47,18 @@ export async function request(Request: Request): Promise<Snapshot> {
     runtime.System.invoke(JSON.stringify({ Id, Request }))
   })
 }
-export function resizePanel(settings: boolean) {
-  void wailsRuntime?.then(runtime => runtime.System.invoke(JSON.stringify({ Id: crypto.randomUUID(), Request: { Action: 'window', Value: settings ? 1 : 0 } })))
+// The window keeps one fixed 16:9 aspect ratio on both pages; no resize request.
+export function resizePanel(_settings: boolean) {}
+export function windowCommand(command: 'window-minimise' | 'window-maximise' | 'window-close') {
+  void wailsRuntime?.then(runtime => runtime.System.invoke(JSON.stringify({ Id: crypto.randomUUID(), Request: { Action: command } })))
 }
 // Explicit preview only; never substitute demo data when hardware requests fail.
 export const preview: Snapshot = {
   Displays: [
-    { Id: 'preview-external', Name: 'AOC U27G4', Brightness: 40, CanAdjust: true, CanAdjustColor: true, Kelvin: 4500, Error: null, IsPrimary: true },
-    { Id: 'preview-internal', Name: '笔记本屏幕', Brightness: 60, CanAdjust: true, CanAdjustColor: false, Kelvin: null, Error: null, IsPrimary: false },
+    { Id: 'preview-external', Name: 'AOC U27G4', Brightness: 22, CanAdjust: true, CanAdjustColor: true, Kelvin: 4600, Error: null, IsPrimary: true },
+    { Id: 'preview-internal', Name: '笔记本屏幕', Brightness: 52, CanAdjust: true, CanAdjustColor: true, Kelvin: 4600, Error: null, IsPrimary: false },
   ],
   Settings: { SchemaVersion: 1, Revision: 0, Language: 'system', Linked: false, LinkWeights: {}, FocusEnabled: false, ControlledDisplayIds: null, KeepSecondaryAwakeOnFullscreen: true, FocusDelaySeconds: 180, ScheduleEnabled: false, LaunchOnStartup: false, TopEdgeBrightnessEnabled: false, BottomEdgeVolumeEnabled: false, EdgeWheelModifier: 'alt',
-    Scenes: ['日常', '夜间', '专注'].map((Name, i) => ({ Id: `preview-${i}`, Name, DefaultName: Name, Behavior: { Linked: false, LinkWeights: {}, FocusEnabled: i === 2, ControlledDisplayIds: null }, Targets: { 'preview-external': { Brightness: [40, 20, 30][i], Kelvin: [6500, 3200, 4500][i] }, 'preview-internal': { Brightness: [60, 30, 45][i], Kelvin: null } } })), Schedule: [] },
-  FocusPaused: false, Source: '视觉预览 · 未连接硬件', Error: null,
+    Scenes: ['早晨', '中午', '傍晚', '夜间'].map((Name, i) => ({ Id: `preview-${i}`, Name, DefaultName: Name, Behavior: { Linked: false, LinkWeights: {}, FocusEnabled: false, ControlledDisplayIds: null }, Targets: { 'preview-external': { Brightness: [30, 37, 22, 10][i], Kelvin: [5600, 6200, 4600, 3200][i] }, 'preview-internal': { Brightness: [60, 67, 52, 25][i], Kelvin: [5600, 6200, 4600, 3300][i] } } })), Schedule: [{ MinuteOfDay: 360, SceneId: 'preview-0', TransitionMinutes: 30 }, { MinuteOfDay: 720, SceneId: 'preview-1', TransitionMinutes: 30 }, { MinuteOfDay: 1080, SceneId: 'preview-2', TransitionMinutes: 30 }, { MinuteOfDay: 1260, SceneId: 'preview-3', TransitionMinutes: 30 }] },
+  FocusPaused: false, Source: '时间计划 · 傍晚', Error: null,
 }
