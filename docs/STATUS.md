@@ -2,6 +2,8 @@
 
 ## 当前 · 2026-11-14
 
+全局文字样式收敛为四档：12px／400、14px／400、16px／500、24px／600；字号与字重统一由主题变量管理，移除 15／17／22px 和随窗口变大的装饰文字。中英文五个设置页的稳定计算样式仅出现前三档，页面连接标题使用第四档；时间轴仍为固定 12px，英文长导航使用同一辅助档。960×540 中英文五页控件无横向溢出；完整构建／lint／Go test／vet／PE 检查通过。已更新正式包 `build/packages/20261114-130229-575/`；完整配置、亮度／色温和专注状态保留，唯一自启指向新包，Error／Warning 为空，更新证据 `build/diagnostics/typography-20261114-{before,update}.json`。未推送。截图 `build/diagnostics/typography-{now,english}.png`。
+
 试用反馈修复：渐变页拖动现在保留时间槽，移动场景及渐变参数，曲线立即更新；原行为仅重排列、绑定时间未变。时间轴改为独立 HTML 固定 12px，不随 SVG 缩放。实际拖放验证时间不变、场景变化、曲线更新，撤销／重做恢复对应曲线；960 和 1280 宽度字体均为 12px。完整构建／lint／Go test／vet／PE 检查通过，已更新正式包 `build/packages/20261114-125918-931/`，完整设置与双屏目标、专注状态保留，自启指向新包，Error／Warning 为空；证据 `build/diagnostics/schedule-reorder-20261114-{before,update}.json`，未推送。截图 `build/diagnostics/schedule-reorder-fixed.png`。
 
 设置改版、舞台／窗口基础与原图蒲公英动画接入已本地提交为 `bee014b`（动画素材与导出脚本为此前 `7920c79`）。完整构建、lint、Go test／vet 与 PE 检查通过后，已于 12:54 合并更新到本机正式包 `build/packages/20261114-125424-218/` 并打开面板供用户试用。更新前后完整 Settings 相同，Revision 82；双屏亮度／色温及专注暂停状态保留，只有一个正式核心，自启指向新包，Error／Warning 为空。证据：`build/diagnostics/settings-and-dandelion-20261114-{before,after,update}.json` 与 `settings-production-build.log`。尚未推送或发布云端下载包；等待用户试用确认后统一推送。
