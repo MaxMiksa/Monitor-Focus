@@ -2,7 +2,9 @@
 
 ## 当前 · 2026-11-14
 
-全局文字样式收敛为四档：12px／400、14px／400、16px／500、24px／600；字号与字重统一由主题变量管理，移除 15／17／22px 和随窗口变大的装饰文字。中英文五个设置页的稳定计算样式仅出现前三档，页面连接标题使用第四档；时间轴仍为固定 12px，英文长导航使用同一辅助档。960×540 中英文五页控件无横向溢出；完整构建／lint／Go test／vet／PE 检查通过。已更新正式包 `build/packages/20261114-130229-575/`；完整配置、亮度／色温和专注状态保留，唯一自启指向新包，Error／Warning 为空，更新证据 `build/diagnostics/typography-20261114-{before,update}.json`。未推送。截图 `build/diagnostics/typography-{now,english}.png`。
+全局下拉菜单改版已基于实际设置页生成圆角玻璃浮层效果图，拟复用现有 Radix UI 组件，统一菜单底色、边框、高亮和勾选；等待视觉确认，尚未修改下拉实现。
+
+全局文字样式进一步收敛为三档：14px／400、16px／500、24px／600，原 12px 全部并入 14px，包括状态、时间轴、节点、场景数值和英文导航；英文导航按文字宽度分配同一紧凑胶囊内空间。960×540 中英文五页计算样式及控件横向溢出检查通过，完整构建／lint／Go test／vet／PE 检查通过，已更新正式包 `build/packages/20261114-130544-622/`，完整配置、双屏目标和专注状态保留，Error／Warning 为空，唯一自启指向新包；证据 `build/diagnostics/typography-three-20261114-{before,update}.json`。未推送。截图 `build/diagnostics/typography-three.png`。
 
 试用反馈修复：渐变页拖动现在保留时间槽，移动场景及渐变参数，曲线立即更新；原行为仅重排列、绑定时间未变。时间轴改为独立 HTML 固定 12px，不随 SVG 缩放。实际拖放验证时间不变、场景变化、曲线更新，撤销／重做恢复对应曲线；960 和 1280 宽度字体均为 12px。完整构建／lint／Go test／vet／PE 检查通过，已更新正式包 `build/packages/20261114-125918-931/`，完整设置与双屏目标、专注状态保留，自启指向新包，Error／Warning 为空；证据 `build/diagnostics/schedule-reorder-20261114-{before,update}.json`，未推送。截图 `build/diagnostics/schedule-reorder-fixed.png`。
 
