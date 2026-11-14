@@ -65,6 +65,8 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 ## 前端与界面
 
+- 场景权重由 `scripts/export-scene-region-mask.py` 从对齐的中午原图按实际轮廓离线生成：天空 204、草地 166、机器 141；输出开发母版 `frontend/public/scene-morph-mask-v7.png` 和无损运行图 `frontend/public/scenes/live/mask.webp`。天空不再保留飞絮／星点白斑、横向灰带或扩大保护。空气／星点直接复用该天空轮廓，无近似地平线、中心椭圆或亮度保护；边界仅由纹理线性采样覆盖相邻像素，不额外模糊或膨胀。生成不进入运行时、不新增纹理或循环。
+
 - `frontend/src/index.css` 是唯一视觉参数入口；组件复用 shadcn 风格控件、Lucide 图标和 Motion 短反馈。重大界面改动先生成效果图并取得确认，再用与当前源码一致的真实截图核对。
 - 快捷面板与设置页共用 960 × 540 DIP 的 16:9 客户区；`window_ratio_windows.go` 用 `WM_SIZING` 和窗口尺寸事件锁定比例，`main.go` 在首次显示及系统贴靠／最大化后恢复并居中。`resizePanel` 仅保留兼容动作，不再切换窗口尺寸。
 - `frontend/public/scenes/` 保存当前版早 / 中 / 傍晚 / 夜四张无文字、无组件的整页 16:9 原创 WebP；`frontend/public/scenes/live/` 保存新版同机位四张 WebP 和一张灰度权重 WebP。仅供开发使用的四张高清 PNG、v7 权重图和 `scene-motion-prototype.html` 留在 `frontend/public/`，Vite 构建结束阶段由 `excludeDevelopmentAssets` 插件从 `frontend/dist` 删除，不进入 exe。正式构建只嵌入场景资源；运行时不请求远程图片或视频，不引入视频解码依赖。真实控件由 React 绘制，避免图片中的按钮与可操作热区错位。
@@ -82,3 +84,5 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 优先保证功能，再做与风险相称的最小检查：`scripts/build.ps1 -Check` 覆盖冻结安装、前端 lint／构建、Go test／vet 与正式构建。涉及真实硬件时，先正常退出现用核心并确认颜色与亮度恢复，再独占运行显式验收入口；普通测试和浏览器预览不写真实显示器或音量。
 
 诊断输出放 `build/diagnostics/`；清理 `build/` 前检查现用进程和登录自启，保留它们指向的包。前端使用项目级共享 pnpm store；改变目录层级后重新安装依赖链接，不清共享缓存。保留用户配置、个人校准和共享依赖缓存；清理一次性临时文件，不提交或发布。真实设备的目标状态、错误、Warning 和唯一自启项应在每次部署后重新核对。界面准则见[产品说明](PRODUCT.md)，本次验证状态与未测边界见[状态说明](STATUS.md)。
+
+全局下拉菜单复用 `frontend/src/components/ui/select.tsx` 的 Radix UI Select，浮层通过 Portal 避免设置内容区裁切，样式定义在 `index.css`。设置导航忽略 combobox／option 内的方向键，应用 Esc 让位于打开的菜单；组件关闭后恢复触发器焦点。

@@ -9,6 +9,7 @@ import { GlassStatus } from '@/components/scene-panel'
 import { Plus, Trash2, RefreshCw, RotateCcw, Undo2, Redo2, Check, LoaderCircle, CircleAlert, ChevronLeft, ChevronRight, Monitor, Laptop, Sun, Thermometer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import { Select } from '@/components/ui/select'
 import { SortableList } from '@/components/sortable-list'
 import { DisplayRow, Level } from '@/App'
 import type { Send } from '@/App'
@@ -38,7 +39,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
     function onKey(event: KeyboardEvent) {
       if (event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
       const target = event.target as HTMLElement | null
-      if (target?.closest('input, select, textarea, [role=slider], [role=switch], [contenteditable=true]')) return
+      if (target?.closest('input, select, textarea, [role=slider], [role=switch], [role=combobox], [role=option], [contenteditable=true]')) return
       if (['ArrowDown', 's', 'S'].includes(event.key)) { event.preventDefault(); close(); return }
       if (['ArrowLeft', 'ArrowRight', 'a', 'A', 'd', 'D'].includes(event.key)) {
         event.preventDefault()
@@ -62,7 +63,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
     {page === 'schedule' && <>
       <ScheduleChart settings={draft} snapshot={snapshot} />
       <SortableList items={draft.Schedule} getKey={point => point.key} getLabel={(_, i) => t('调整时间点 {0} 的顺序', i + 1)} onReorder={points => change(s => { const times = s.Schedule.map(point => point.MinuteOfDay); s.Schedule = points.map((point, index) => ({ ...point, MinuteOfDay: times[index] })) })}>
-        {(point, i, handle) => <div className="plan-row">{handle}<input aria-label={t('时间点 {0}', i + 1)} type="time" required value={`${String(Math.floor(point.MinuteOfDay / 60)).padStart(2, '0')}:${String(point.MinuteOfDay % 60).padStart(2, '0')}`} onChange={e => { if (!e.target.value) return; const [h, m] = e.target.value.split(':').map(Number); change(s => { s.Schedule[i].MinuteOfDay = h * 60 + m }) }} /><select aria-label={t('时间点 {0} 场景', i + 1)} value={point.SceneId} onChange={e => change(s => { s.Schedule[i].SceneId = e.target.value })}>{draft.Scenes.map(scene => <option key={scene.Id} value={scene.Id}>{sceneName(scene)}</option>)}</select><Button aria-label={t('删除时间点 {0}', i + 1)} variant="ghost" size="icon" onClick={() => change(s => { s.Schedule.splice(i, 1) })}><Trash2 /></Button></div>}
+        {(point, i, handle) => <div className="plan-row">{handle}<input aria-label={t('时间点 {0}', i + 1)} type="time" required value={`${String(Math.floor(point.MinuteOfDay / 60)).padStart(2, '0')}:${String(point.MinuteOfDay % 60).padStart(2, '0')}`} onChange={e => { if (!e.target.value) return; const [h, m] = e.target.value.split(':').map(Number); change(s => { s.Schedule[i].MinuteOfDay = h * 60 + m }) }} /><Select aria-label={t('时间点 {0} 场景', i + 1)} value={point.SceneId} onValueChange={value => change(s => { s.Schedule[i].SceneId = value })} options={draft.Scenes.map(scene => ({ value: scene.Id, label: sceneName(scene) }))} /><Button aria-label={t('删除时间点 {0}', i + 1)} variant="ghost" size="icon" onClick={() => change(s => { s.Schedule.splice(i, 1) })}><Trash2 /></Button></div>}
       </SortableList>
       <div className="actions schedule-actions"><div className="schedule-enable"><label htmlFor="schedule">{t('自动渐变')}</label><Switch id="schedule" checked={draft.ScheduleEnabled} onCheckedChange={on => change(s => { s.ScheduleEnabled = on })} /></div><div className="global-transition"><input aria-label={t('渐变时长（分钟）')} type="number" min={0} max={1440} placeholder="—" value={mixedTransition ? '' : transitionMinutes} onChange={e => { const minutes = e.target.valueAsNumber; if (!Number.isInteger(minutes) || minutes < 0 || minutes > 1440) return; change(s => { s.ScheduleTransitionMinutes = minutes; s.Schedule.forEach(point => { point.TransitionMinutes = minutes }) }) }} /><span>{t('分钟')}</span></div><Button variant="outline" disabled={!draft.Scenes.length} onClick={() => change(s => { s.Schedule.push({ key: crypto.randomUUID(), MinuteOfDay: 1080, SceneId: s.Scenes[0].Id, TransitionMinutes: transitionMinutes }) })}><Plus />{t('添加时间点')}</Button></div>
     </>}
@@ -83,14 +84,14 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
       <div className="form-row"><label htmlFor="delay">{t('等待时间（秒）')}</label><input id="delay" type="number" min={0} max={600} value={draft.FocusDelaySeconds} onChange={e => change(s => { s.FocusDelaySeconds = e.target.valueAsNumber || 0 })} /></div>
     </>}
     {page === 'general' && <>
-      <div className="form-row"><label htmlFor="stage-style">{t('主界面样式')}</label><select id="stage-style" value={stageStyle} onChange={e => change(s => { s.appearance.stage = e.target.value === 'classic' ? 'classic' : 'live' })}><option value="live">{t('新版实时换光')}</option><option value="classic">{t('当前版整页换肤')}</option></select></div>
-      <div className="form-row"><label htmlFor="scene-bar-style">{t('场景栏样式')}</label><select id="scene-bar-style" value={barStyle} onChange={e => change(s => { s.appearance.bar = e.target.value === 'icon' ? 'icon' : e.target.value === 'both' ? 'both' : 'text' })}><option value="text">{t('仅文字')}</option><option value="icon">{t('仅图标')}</option><option value="both">{t('文字与图标')}</option></select></div>
+      <div className="form-row"><label htmlFor="stage-style">{t('主界面样式')}</label><Select id="stage-style" value={stageStyle} onValueChange={value => change(s => { s.appearance.stage = value === 'classic' ? 'classic' : 'live' })} options={[{ value: 'live', label: t('新版实时换光') }, { value: 'classic', label: t('当前版整页换肤') }]} /></div>
+      <div className="form-row"><label htmlFor="scene-bar-style">{t('场景栏样式')}</label><Select id="scene-bar-style" value={barStyle} onValueChange={value => change(s => { s.appearance.bar = value === 'icon' ? 'icon' : value === 'both' ? 'both' : 'text' })} options={[{ value: 'text', label: t('仅文字') }, { value: 'icon', label: t('仅图标') }, { value: 'both', label: t('文字与图标') }]} /></div>
       <div className="form-row"><label htmlFor="air-opacity">{t('空气透明度')}</label><div className="air-opacity-control"><input id="air-opacity" type="range" min={0} max={100} step={1} value={airOpacity} aria-valuetext={`${airOpacity}%`} onChange={e => change(s => { s.appearance.air = e.target.valueAsNumber })} /><output htmlFor="air-opacity">{airOpacity}%</output></div></div>
-      <div className="form-row"><label htmlFor="language">{t('语言')}</label><select id="language" value={draft.Language ?? 'system'} onChange={e => { const language = e.target.value as Language; change(s => { s.Language = language }); setLanguage(language) }}><option value="system">{t('跟随系统')}</option><option value="zh-CN">简体中文</option><option value="en">English</option></select></div>
+      <div className="form-row"><label htmlFor="language">{t('语言')}</label><Select id="language" value={draft.Language ?? 'system'} onValueChange={value => { const language = value as Language; change(s => { s.Language = language }); setLanguage(language) }} options={[{ value: 'system', label: t('跟随系统') }, { value: 'zh-CN', label: '简体中文' }, { value: 'en', label: 'English' }]} /></div>
       <div className="form-row"><label htmlFor="startup">{t('登录后自动启动')}</label><Switch id="startup" checked={draft.LaunchOnStartup} onCheckedChange={on => change(s => { s.LaunchOnStartup = on })} /></div>
       <div className="form-row"><label htmlFor="edge-brightness">{t('顶部滚轮调节亮度')}</label><Switch id="edge-brightness" checked={draft.TopEdgeBrightnessEnabled ?? false} onCheckedChange={on => change(s => { s.TopEdgeBrightnessEnabled = on })} /></div>
       <div className="form-row"><label htmlFor="edge-volume">{t('底部滚轮调节音量')}</label><Switch id="edge-volume" checked={draft.BottomEdgeVolumeEnabled ?? false} onCheckedChange={on => change(s => { s.BottomEdgeVolumeEnabled = on })} /></div>
-      <div className="form-row"><label htmlFor="edge-modifier">{t('色温／应用音量按键')}</label><select id="edge-modifier" value={draft.EdgeWheelModifier ?? 'alt'} onChange={e => change(s => { s.EdgeWheelModifier = e.target.value as EdgeWheelModifier })}><option value="alt">Alt</option><option value="ctrl">Ctrl</option><option value="shift">Shift</option></select></div>
+      <div className="form-row"><label htmlFor="edge-modifier">{t('色温／应用音量按键')}</label><Select id="edge-modifier" value={draft.EdgeWheelModifier ?? 'alt'} onValueChange={value => change(s => { s.EdgeWheelModifier = value as EdgeWheelModifier })} options={[{ value: 'alt', label: 'Alt' }, { value: 'ctrl', label: 'Ctrl' }, { value: 'shift', label: 'Shift' }]} /></div>
     </>}
     </div>
     <footer className="settings-bottom">
@@ -139,7 +140,7 @@ function ControlledDisplays({ id, snapshot, value, onChange }: { id: string; sna
   const displays = snapshot.Displays.filter(d => !d.IsPrimary)
   const offline = (value ?? []).filter(key => !snapshot.Displays.some(d => d.Id === key))
   return <>
-    <div className="form-row"><label htmlFor={`${id}-controlled`}>{t('参与专注的副屏')}</label><select id={`${id}-controlled`} value={value === null ? 'all' : 'selected'} onChange={e => onChange(e.target.value === 'all' ? null : displays.map(d => d.Id))}><option value="all">{t('全部副屏')}</option><option value="selected">{t('指定副屏')}</option></select></div>
+    <div className="form-row"><label htmlFor={`${id}-controlled`}>{t('参与专注的副屏')}</label><Select id={`${id}-controlled`} value={value === null ? 'all' : 'selected'} onValueChange={selected => onChange(selected === 'all' ? null : displays.map(d => d.Id))} options={[{ value: 'all', label: t('全部副屏') }, { value: 'selected', label: t('指定副屏') }]} /></div>
     {value !== null && [...displays.map(d => ({ Id: d.Id, Name: displayName(d.Name) })), ...offline.map(Id => ({ Id, Name: t('{0}（离线）', Id) }))].map(d => <div className="form-row" key={d.Id}><label htmlFor={`${id}-controlled-${d.Id}`}>{d.Name}</label><Switch id={`${id}-controlled-${d.Id}`} checked={value.includes(d.Id)} onCheckedChange={on => onChange(on ? [...value, d.Id] : value.filter(key => key !== d.Id))} /></div>)}
   </>
 }

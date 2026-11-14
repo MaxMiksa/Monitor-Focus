@@ -82,6 +82,7 @@ export default function App() {
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.defaultPrevented || event.key !== 'Escape' || event.repeat || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+      if (document.querySelector('[data-slot=select-content]') || (event.target as HTMLElement | null)?.closest('[data-slot=select-content]')) return
       event.preventDefault()
       if (settingsOpen) { setSettingsOpen(false); return }
       void (async () => { if (!editor.current || await editor.current.flush()) windowCommand('window-close'); else setSettingsOpen(true) })()
