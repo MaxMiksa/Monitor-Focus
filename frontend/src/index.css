@@ -304,3 +304,8 @@ input[type=number] { width: 104px; }
 .schedule-enable { padding: 4px 10px; border: 1px solid rgba(255,255,255,.20); border-radius: 999px; background: rgba(255,255,255,.035); }
 .global-transition { display: flex; align-items: center; gap: 7px; }
 .settings-float .global-transition input { width: 58px; text-align: center; }
+
+.schedule-chart { display: grid; align-content: center; }
+.schedule-chart > svg { display: block; width: 100%; height: auto; }
+.schedule-time-axis { position: relative; height: 20px; margin-inline: 3.75%; font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums; }
+.schedule-time-axis > span { position: absolute; top: 0; white-space: nowrap; }
