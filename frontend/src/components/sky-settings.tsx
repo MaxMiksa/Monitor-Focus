@@ -34,7 +34,7 @@ export function SkySettingsEditor({ scene, selectScene, value, change, back }: {
       </section>
       <section className="sky-effect-card" aria-label={t('云彩')}>
         <div className="sky-effect-heading"><h2><CloudSun />{t('云彩')}</h2><Switch aria-label={t('显示云彩')} checked={sky.clouds.enabled} onCheckedChange={on => change(s => { s.clouds.enabled = on })} /></div>
-        <Select aria-label={t('云彩样式')} value={sky.clouds.style} onValueChange={v => change(s => { s.clouds.style = v === 'puffs' || v === 'layers' ? v : 'wisps' })} options={[{ value: 'wisps', label: t('轻薄流云') }, { value: 'puffs', label: t('蓬松云团') }, { value: 'layers', label: t('层叠云海') }]} />
+        <Select aria-label={t('云彩样式')} value={sky.clouds.style} onValueChange={v => change(s => { s.clouds.style = v === 'legacy' || v === 'puffs' || v === 'layers' ? v : 'wisps' })} options={[{ value: 'legacy', label: '旧版薄云 · 增强' }, { value: 'wisps', label: t('轻薄流云') }, { value: 'puffs', label: t('蓬松云团') }, { value: 'layers', label: t('层叠云海') }]} />
         <SkySlider label="浓度" aria="云彩浓度" value={sky.clouds.density} change={v => change(s => { s.clouds.density = v })} />
         <SkySlider label="速度" aria="云彩速度" value={sky.clouds.speed} change={v => change(s => { s.clouds.speed = v })} />
       </section>

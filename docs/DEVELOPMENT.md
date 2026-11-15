@@ -71,7 +71,7 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 - 快捷面板与设置页共用 1168 × 657 DIP（较上一版宽高再增约 10%；最小宽 1024 DIP） 的 16:9 客户区；`window_ratio_windows.go` 用 `WM_SIZING` 和窗口尺寸事件锁定比例，`main.go` 在首次显示及系统贴靠／最大化后恢复并居中。`resizePanel` 仅保留兼容动作，不再切换窗口尺寸。
 - `frontend/public/scenes/` 保存当前版早 / 中 / 傍晚 / 夜四张无文字、无组件的整页 16:9 原创 WebP；`frontend/public/scenes/live/` 保存新版同机位四张 WebP 和一张灰度权重 WebP。仅供开发使用的四张高清 PNG、v7 权重图和 `scene-motion-prototype.html` 留在 `frontend/public/`，Vite 构建结束阶段由 `excludeDevelopmentAssets` 插件从 `frontend/dist` 删除，不进入 exe。正式构建只嵌入场景资源；运行时不请求远程图片或视频，不引入视频解码依赖。真实控件由 React 绘制，避免图片中的按钮与可操作热区错位。
 - 新版舞台的 `LiveSceneStage` 默认启用，「设置 → 通用 → 主界面样式」可切回当前版；偏好存于 `localStorage` 并由 `storage` 事件同步，不进入 Go `Settings`、不改 Revision 或配置迁移。底图常态仅一张全尺寸画面、一张权重图和一张 640×320 飞絮天空补片图集；切换时临时多一张目标画面，完成后直接交换并释放旧纹理，不再重复上传。隐藏、减少动态效果时停止循环；WebGL 初始化失败释放上下文并按当前场景显示原始静态图。
-- `SkyEffects` 复用 `@pmndrs/vanilla` 1.25.0 的 `Clouds`／`Cloud`／`Stars` 与 Three.js 0.187.0，替代手写空气／星点程序。一个透明 WebGL2 画布、最多 72 个实例云片和 18,000 个星点（通过 drawRange 调数量），不逐帧重建几何体；旧噪声纹理已移除。云纹理 `cloud.png` 从上游固定提交本地打包，许可／来源纳入 notices，不请求 CDN。最高 20 fps，隐藏暂停，减少动态效果时只绘静态帧，卸载释放几何／纹理／材质／上下文；长期资源走势未验收。`sky-preference.ts` 校验并保存四场景偏好，纳入现有自动保存／撤销；天空编辑仅发临时画面预览事件，不发送硬件场景请求。当前版背景保留原样，打开天空编辑时临时预览新版舞台。TypeScript 显式映射 three 类型，兼容共享 pnpm store。
+- `SkyEffects` 复用 `@pmndrs/vanilla` 1.25.0 的 `Clouds`／`Cloud`／`Stars` 与 Three.js 0.187.0，替代手写空气／星点程序。一个透明 WebGL2 画布、最多 72 个实例云片和 18,000 个星点（通过 drawRange 调数量），不逐帧重建几何体；新增可保存的旧版薄云增强，恢复原四层噪声与三层扭曲薄云，去除亮度／时段／遮罩的重复衰减，白色云光与浓度对比独立计算。云纹理 `cloud.png` 从上游固定提交本地打包，许可／来源纳入 notices，不请求 CDN。最高 20 fps，隐藏暂停，减少动态效果时只绘静态帧，卸载释放几何／纹理／材质／上下文；长期资源走势未验收。`sky-preference.ts` 校验并保存四场景偏好，纳入现有自动保存／撤销；天空编辑仅发临时画面预览事件，不发送硬件场景请求。当前版背景保留原样，打开天空编辑时临时预览新版舞台。TypeScript 显式映射 three 类型，兼容共享 pnpm store。
 - 飞絮由 `scripts/export-seed-patches.py` 离线制作局部补片，输出 `frontend/public/scenes/live/seed-sky-patches.png` 与 `frontend/src/lib/seed-patches.json`。不改原始 WebP；同一片元程序先补原位置，再从原图减去补片，搬移有符号细节，避免蓝色矩形边缘。10 个偏移量每次绘制计算一次，复用 80 字节数组，不逐像素算轨迹；独立 120 秒无缝时钟，不随场景切换重置。图集 RGB 上传数据 600 KiB，驱动实际内存另测；生成过程只依赖开发机 Python／Pillow／NumPy／OpenCV，产品不依赖它们。
 - 快捷面板的四颗按钮按场景名称显式映射早 / 中 / 傍晚 / 夜，不按目标小时就近取场景；无法识别的名称才按亮度兜底。浏览器示例数据与每日计划同步使用四个场景和四个节点。亮度滑条左端月亮、右端太阳，表示从暗到亮；更多控制只列出未映射到四颗按钮的场景。
 - 前端通过 Wails runtime 发送请求并等待 `monitor-focus-reply`；示例数据只在明确 `?preview=1` 的浏览器预览中出现，硬件请求失败不回退成演示成功。
@@ -93,3 +93,13 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 诊断输出放 `build/diagnostics/`；清理 `build/` 前检查现用进程和登录自启，保留它们指向的包。前端使用项目级共享 pnpm store；改变目录层级后重新安装依赖链接，不清共享缓存。保留用户配置、个人校准和共享依赖缓存；清理一次性临时文件。阶段完成后仅做必要验证，部署正式版，再提交并推送本轮改动；不夹带工作区其他未完成改动。已合并／过时 worktree 自动清理，托管 worktree 用归档工具；唯一主工作区保留。成功部署后由 scripts/Remove-OldPackages.ps1 将本地 build/packages 中超过最近 5 个的旧包移入回收站；清理前一次性核对所有目标位于包目录内且非运行／自启路径，未知目录不删除；不清理远端历史。真实设备的目标状态、错误、Warning 和唯一自启项应在每次部署后重新核对。界面准则见[产品说明](PRODUCT.md)，本次验证状态与未测边界见[状态说明](STATUS.md)。
 
 全局下拉菜单复用 `frontend/src/components/ui/select.tsx` 的 Radix UI Select，浮层通过 Portal 避免设置内容区裁切，样式定义在 `index.css`。设置导航忽略 combobox／option 内的方向键，应用 Esc 让位于打开的菜单；组件关闭后恢复触发器焦点。
+
+## 临时云朵测试栏
+
+首页顶部 `cloud-test-bar.tsx` 复用现有 Select／Slider；当前设置、无云对照与七款候选：旧版增强、Takram 积云／高层云、Three.js 官方体积云、MarchingCubes 两款卡通预设、现版 pmndrs。场景／浓度／速度仅驻留组件状态，不改正式偏好或硬件；恢复按钮、打开设置或关闭面板释放测试候选，测试栏本身保留以供快速比较。旧版增强也可在天空设置中保存。
+
+`cloud-lab-effects.tsx` 按需加载，单个候选画布，最高20fps；隐藏暂停，速度／浓度归零或减少动态效果时仅静态帧，切换释放自身资源。Takram 使用 three-clouds0.7.6／three-atmosphere0.19.1／three-geospatial0.9.1及postprocessing6.39.6，全部纹理打包到 scenes/cloud-lab，不请求远端资源。上游仍为Beta、开销较重，不能当作最终轻量选型结论。Three.js体积云改编官方r187例子；卡通复用维护中的MarchingCubes造型工具，是项目造型预设，不是专用成熟云组件。原站入口保留来源，许可证在两份notices中。
+
+验收截图位于 build/diagnostics/cloud-research/。本轮仅做界面切换／可见度与构建检查，不将短测描述为长期性能或最终美术验收。发布用已提交原生基线隔离构建，不夹带工作区显示／恢复未完成修改。
+
+本轮正式部署：build/packages/20261116-002312-320；更新／唯一自启与硬件目标保留见 build/diagnostics/cloud-lab-20261116-update.json。界面候选、浓度端点、恢复释放及单次原生开关结果见 cloud-research/verification.json；原生截屏返回黑图未作证据，效果图为同源码浏览器预览。已保留最近五个正式包。

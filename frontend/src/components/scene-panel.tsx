@@ -9,6 +9,9 @@ import { useSceneBarStyle, useStageStyle } from '@/lib/stage-preference'
 import { LiveSceneStage } from '@/components/live-scene-stage'
 import { useWeatherRain } from '@/lib/weather'
 import { SkyEffects } from '@/components/sky-effects'
+import { CloudTestBar } from '@/components/cloud-test-bar'
+import { CloudLabEffects } from '@/components/cloud-lab-effects'
+import { initialCloudLab } from '@/lib/cloud-lab'
 import { SKY_PREVIEW_EVENT, skyScenes } from '@/lib/sky-preference'
 import type { Display, Snapshot } from '@/lib/control'
 import type { Send } from '@/App'
@@ -118,6 +121,8 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
   const [style] = useStageStyle()
   const [barStyle] = useSceneBarStyle()
   const [skyPreview, setSkyPreview] = useState<StageKey | null>(null)
+  const [cloudLab, setCloudLab] = useState(initialCloudLab)
+  const cloudTesting = !settingsOpen && cloudLab.candidate !== 'saved'
   useEffect(() => {
     const listener = (event: Event) => {
       const value = (event as CustomEvent).detail
@@ -126,7 +131,7 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
     window.addEventListener(SKY_PREVIEW_EVENT, listener)
     return () => window.removeEventListener(SKY_PREVIEW_EVENT, listener)
   }, [])
-  const live = style === 'live' || (settingsOpen && skyPreview !== null)
+  const live = style === 'live' || (settingsOpen && skyPreview !== null) || cloudTesting
   const rain = useWeatherRain(live)
   const fullBarOpen = !live && !settingsOpen
   const ids = useMemo(() => inferSceneKeys(snapshot), [snapshot])
@@ -229,14 +234,15 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
   }, [change, scene, settingsOpen, openSettings])
 
   const displays = snapshot.Displays.slice(0, 2)
-  const visibleStage = settingsOpen && skyPreview ? skyPreview : stage
+  const visibleStage = cloudTesting ? cloudLab.scene : settingsOpen && skyPreview ? skyPreview : stage
   const caption = stageNames[visibleStage]
   return <div className="scene-shell" data-scene={visibleStage} data-stage={live ? 'live' : 'classic'} data-settings-open={settingsOpen}>
     <div className="scene-backdrop" aria-hidden="true">
-      {live ? <><LiveSceneStage key="live" scene={visibleStage} reduced={!!reduced} rain={rain} /><SkyEffects scene={visibleStage} reduced={!!reduced} /></> : (Object.keys(sceneAssets) as StageKey[]).map(key => <div key={key} className="scene-image" data-active={stage === key} style={{ backgroundImage: `url('${sceneAssets[key]}')` }} />)}
+      {live ? <><LiveSceneStage key="live" scene={visibleStage} reduced={!!reduced} rain={rain} /><SkyEffects scene={visibleStage} reduced={!!reduced} cloudLab={cloudTesting ? cloudLab : null} />{cloudTesting && <CloudLabEffects value={cloudLab} reduced={!!reduced} />}</> : (Object.keys(sceneAssets) as StageKey[]).map(key => <div key={key} className="scene-image" data-active={stage === key} style={{ backgroundImage: `url('${sceneAssets[key]}')` }} />)}
     </div>
     <div className="window-drag-region" data-app-region="drag" aria-hidden="true" />
     <div className="scene-wash" aria-hidden="true" />
+    {!settingsOpen && <CloudTestBar value={cloudLab} change={setCloudLab} />}
     {live && !reduced && <div className="live-stage-breath" aria-hidden="true" data-scene={visibleStage} />}
     <h1 className="scene-title" aria-live="polite">{caption}</h1>
     <AnimatePresence mode="wait" initial={false}>

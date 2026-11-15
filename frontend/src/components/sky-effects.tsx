@@ -1,20 +1,22 @@
 import { useEffect, useRef } from 'react'
-import { Scene, PerspectiveCamera, WebGLRenderer, TextureLoader, MeshBasicMaterial, Color, Vector3, SRGBColorSpace } from 'three'
+import { Scene, PerspectiveCamera, WebGLRenderer, TextureLoader, MeshBasicMaterial, Color, Vector3, SRGBColorSpace, Mesh, PlaneGeometry } from 'three'
 import { Cloud, Clouds } from '@pmndrs/vanilla/core/Cloud'
 import { Stars } from '@pmndrs/vanilla/core/Stars'
 import { readSkyPreferences, SKY_EVENT } from '@/lib/sky-preference'
 import type { StageKey } from '@/components/scene-panel'
 import type { SkySettings } from '@/lib/sky-preference'
+import type { CloudLabSettings } from '@/lib/cloud-lab'
+import { createLegacyMaterial } from '@/lib/cloud-legacy'
 
 const colors = { morning: '#fff1dc', midday: '#eef8ff', dusk: '#ffbb9a', night: '#7583b0' }
 
 // Upstream pmndrs components own the cloud particles and star shaders. This
 // adapter only supplies presets, scene clipping and our paused/throttled clock.
-export function SkyEffects({ scene, reduced }: { scene: StageKey; reduced: boolean }) {
+export function SkyEffects({ scene, reduced, cloudLab = null }: { scene: StageKey; reduced: boolean; cloudLab?: CloudLabSettings | null }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const current = useRef({ scene, reduced })
+  const current = useRef({ scene, reduced, cloudLab })
   const refresh = useRef<(() => void) | null>(null)
-  useEffect(() => { current.current = { scene, reduced }; refresh.current?.() }, [scene, reduced])
+  useEffect(() => { current.current = { scene, reduced, cloudLab }; refresh.current?.() }, [scene, reduced, cloudLab])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -49,6 +51,12 @@ export function SkyEffects({ scene, reduced }: { scene: StageKey; reduced: boole
       return cloud
     })
     world.add(clouds)
+    const legacy = createLegacyMaterial()
+    const legacyGeometry = new PlaneGeometry(2, 2)
+    const legacyClouds = new Mesh(legacyGeometry, legacy.material)
+    legacyClouds.frustumCulled = false
+    legacyClouds.renderOrder = 2
+    world.add(legacyClouds)
     let settings: SkySettings = readSkyPreferences()[current.current.scene]
     let timer = 0
     let lastTime = performance.now()
@@ -67,6 +75,8 @@ export function SkyEffects({ scene, reduced }: { scene: StageKey; reduced: boole
 
     const configure = () => {
       settings = readSkyPreferences()[current.current.scene]
+      const test = current.current.cloudLab
+      if (test) settings.clouds = { enabled: test.candidate === 'pmndrs', style: 'puffs', density: test.density, speed: test.speed }
       const { stars: s, clouds: c } = settings
       stars.visible = s.enabled && s.count > 0 && s.brightness > 0
       stars.geometry.setDrawRange(0, Math.round((s.style === 'dense' ? 18000 : 1800) * s.count / 100))
@@ -76,7 +86,10 @@ export function SkyEffects({ scene, reduced }: { scene: StageKey; reduced: boole
         starColors.needsUpdate = true
         lastBrightness = s.brightness
       }
-      clouds.visible = c.enabled && c.density > 0 && cloudsReady
+      clouds.visible = c.enabled && c.style !== 'legacy' && c.density > 0 && cloudsReady
+      legacyClouds.visible = c.enabled && c.style === 'legacy' && c.density > 0
+      legacy.material.uniforms.density.value = c.density / 100
+      legacy.material.uniforms.tint.value.set(colors[current.current.scene])
       groups.forEach((cloud, index) => {
         cloud.color = new Color(colors[current.current.scene])
         cloud.opacity = c.density / 100 * (c.style === 'wisps' ? .38 : .70)
@@ -103,13 +116,14 @@ export function SkyEffects({ scene, reduced }: { scene: StageKey; reduced: boole
     const render = () => {
       world.updateMatrixWorld(true)
       stars.update(starTime)
+      legacy.material.uniforms.phase.value = cloudTime * .19
       groups.forEach((cloud, index) => { cloud.position.x = (index - 1) * (settings.clouds.style === 'puffs' ? 6.8 : 4.6) + Math.sin(cloudTime * .09 + index * 1.7) * 1.6 })
       clouds.update(camera, cloudTime, 0)
       renderer.render(world, camera)
       canvas.dataset.ready = 'true'
     }
     const paused = () => current.current.reduced || document.hidden || !canvas.isConnected
-    const animated = () => (clouds.visible && settings.clouds.speed > 0) || (stars.visible && settings.stars.twinkle > 0)
+    const animated = () => ((clouds.visible || legacyClouds.visible) && settings.clouds.speed > 0) || (stars.visible && settings.stars.twinkle > 0)
     const tick = () => {
       timer = 0
       if (disposed || paused()) return
@@ -151,6 +165,9 @@ export function SkyEffects({ scene, reduced }: { scene: StageKey; reduced: boole
       clouds.instance.dispose()
       clouds.cloudMaterial.dispose()
       texture.dispose()
+      legacyGeometry.dispose()
+      legacy.material.dispose()
+      legacy.noise.dispose()
       renderer.dispose()
       // React development StrictMode immediately remounts the same canvas.
       // Lose the context only once it is actually detached.
