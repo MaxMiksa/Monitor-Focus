@@ -5,11 +5,12 @@ const presets = [
   { id: 'soft', name: '柔和雨幕', engine: 'tsParticles', detail: '柔边雨丝，疏密有致。比轻细雨更有存在感。', kind: 'ts', url: 'https://github.com/tsparticles/tsparticles' },
   { id: 'natural', name: '立体自然雨', engine: 'three.quarks', detail: '远近三层，细雨有空间。近处稍快，远处更轻。', kind: 'quarks', url: 'https://github.com/Alchemist0823/three.quarks' },
   { id: 'cinema', name: '电影感雨丝', engine: 'three.quarks', detail: '稀疏长雨丝，柔光拖尾。更安静，也更有氛围。', kind: 'quarks', url: 'https://github.com/Alchemist0823/three.quarks' },
-  { id: 'wind', name: '斜风雨', engine: 'three.quarks', detail: '更明显的斜向落雨，随风有轻微变化。适合大雨。', kind: 'quarks', url: 'https://github.com/Alchemist0823/three.quarks' },
+  { id: 'wind', name: '斜风雨', engine: 'three.quarks', detail: '远密近疏，随风斜落；机顶细碎水珠短暂散开，雨丝自然飘过。', kind: 'quarks', url: 'https://github.com/Alchemist0823/three.quarks' },
   { id: 'cloud', name: '小乌云淋雨', engine: 'three.quarks', detail: '一朵乌云轻飘，局部落雨，击中机顶溅起小水花。', kind: 'local', url: 'https://github.com/Alchemist0823/three.quarks' },
 ]
-let selected = 5, amount = .65, paused = false, baseline = false
+let selected = 4, amount = .75, paused = false, baseline = false
 let active = null, revision = 0, saved = null
+let splashEnabled = true
 const frameBudget = 30
 try {
   const remembered = JSON.parse(localStorage.getItem('monitors-focus.rain-gallery-choice') || 'null')
@@ -28,8 +29,8 @@ function report(count, fps, splashes) {
   host.dataset.particles = String(count)
   host.dataset.paused = String(paused || baseline || document.hidden || amount === 0)
 }
-// Each new review opens on the newly approved local-cloud candidate.
-if (!saved || saved.id !== 'cloud') { selected = 5; amount = .65 }
+// Open this review on the selected wind-rain direction.
+if (!saved || saved.id !== 'wind') { selected = 4; amount = .75 }
 $('#intensity').value = String(Math.round(amount * 100))
 const chooseButtons = presets.map((preset, index) => {
   const button = document.createElement('button')
@@ -46,6 +47,8 @@ function present() {
   $('#current-title').textContent = `0${selected + 1} · ${presets[selected].name}`
   $('#description').textContent = presets[selected].detail
   $('#source').href = presets[selected].url
+  $('#splash').hidden = presets[selected].id !== 'wind'
+  $('#splash').setAttribute('aria-pressed', String(splashEnabled))
   document.body.classList.toggle('local-cloud', presets[selected].kind === 'local')
   const value = Math.round(amount * 100)
   $('#intensity-value').textContent = `${value} · ${value === 0 ? '无雨' : value < 30 ? '小雨' : value < 70 ? '中雨' : '大雨'}`
@@ -57,6 +60,7 @@ function present() {
   $('#chosen').textContent = saved ? `已记住：${saved.name} · 雨量 ${saved.intensity}` : ''
 }
 function synchronize() {
+  active?.setSplashes?.(splashEnabled)
   active?.setAmount(baseline ? 0 : amount)
   active?.setPaused(paused || baseline || document.hidden || amount === 0)
   present()
@@ -77,6 +81,7 @@ async function switchEffect() {
     const preset = presets[selected]
     const runtime = preset.kind === 'local'
       ? await (await import('./local-cloud.js')).createLocalCloud(slot, report)
+      : preset.id === 'wind' ? await (await import('./wind-rain.js')).createWindRain(slot, report)
       : preset.kind === 'ts' ? await createParticles(slot, preset) : await createQuarks(slot, preset)
     if (token !== revision) { runtime.dispose(); slot.remove(); return }
     active = runtime
@@ -281,6 +286,7 @@ document.querySelectorAll('[data-scene]').forEach(button => button.addEventListe
 }))
 $('#baseline').addEventListener('click', () => { baseline = !baseline; synchronize() })
 $('#pause').addEventListener('click', () => { paused = !paused; synchronize() })
+$('#splash').addEventListener('click', () => { splashEnabled = !splashEnabled; synchronize() })
 $('#choose').addEventListener('click', () => {
   saved = { id: presets[selected].id, name: presets[selected].name, intensity: Math.round(amount * 100) }
   // Preview choice is isolated from application weather/settings state.
