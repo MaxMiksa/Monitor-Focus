@@ -19,9 +19,12 @@ const seedCalls = (operation: string) => seedPatches.origins.map(([x, y], index)
 
 const vertexSource = `
   attribute vec2 position;
+  uniform float captureFrame;
   varying vec2 uv;
   void main() {
     uv = vec2(position.x * .5 + .5, .5 - position.y * .5);
+    // FBO storage must have the same top-first orientation as uploaded images.
+    uv.y = mix(uv.y, 1.0 - uv.y, captureFrame);
     gl_Position = vec4(position, 0.0, 1.0);
   }
 `
@@ -48,6 +51,9 @@ const fragmentSource = `
   uniform vec2 seedRows;
   uniform vec2 seedOffsets[${seedPatches.origins.length}];
   uniform float progress;
+  uniform float fromSnapshot;
+  uniform float toSnapshot;
+  uniform float captureFrame;
   uniform float direction;
   uniform float rainAmount;
   uniform float rainTime;
@@ -80,8 +86,8 @@ const fragmentSource = `
   void clearSeed(inout vec3 a, inout vec3 b, vec2 pixel, vec2 origin, float index) {
     vec2 p = pixel - origin;
     if (inSeed(p)) {
-      a = seedSky(p, index, seedRows.x);
-      b = seedSky(p, index, seedRows.y);
+      if (fromSnapshot < .5) a = seedSky(p, index, seedRows.x);
+      if (toSnapshot < .5) b = seedSky(p, index, seedRows.y);
     }
   }
   void driftSeed(inout vec3 a, inout vec3 b, vec2 pixel, vec2 origin, float index, vec2 offset) {
@@ -89,8 +95,8 @@ const fragmentSource = `
     if (inSeed(p)) {
       vec2 originalUv = (origin + p) / imageSize;
       // Signed detail preserves both pale hairs and darker stems. No blue rectangle.
-      a += texture2D(fromFrame, originalUv).rgb - seedSky(p, index, seedRows.x);
-      b += texture2D(toFrame, originalUv).rgb - seedSky(p, index, seedRows.y);
+      if (fromSnapshot < .5) a += texture2D(fromFrame, originalUv).rgb - seedSky(p, index, seedRows.x);
+      if (toSnapshot < .5) b += texture2D(toFrame, originalUv).rgb - seedSky(p, index, seedRows.y);
     }
   }
   void main() {
@@ -115,7 +121,8 @@ const fragmentSource = `
     float highlight = sin(progress * 3.14159) * difference * region * .018;
     color += vec3(highlight * .85, highlight, highlight * 1.15);
 
-    if (rainAmount > .001) {
+    // Rain is applied once after composition, never baked into the handoff.
+    if (rainAmount > .001 && captureFrame < .5) {
       float sky = clamp((region * 255.0 - 166.0) / 38.0, 0.0, 1.0);
       float grey = dot(color, vec3(.2126, .7152, .0722));
       color = mix(color, vec3(grey) * vec3(.91, .97, 1.02), rainAmount * .22);
@@ -175,16 +182,21 @@ type StageRuntime = {
   lastDraw: number
   transitionStart: number
   current: WebGLTexture
+  fromSnapshot: boolean
+  presentedProgress: number
+  presentedSeedPhase: number
   target: WebGLTexture | null
   scene: StageKey
   previous: StageKey
   wanted: StageKey
   running: boolean
   loading: boolean
+  loadController: AbortController | null
+  loadingScene: StageKey | null
   animation: number
   direction: number
   reduced: boolean
-  uniforms: Record<'from' | 'to' | 'mask' | 'seeds' | 'seedRows' | 'seedOffsets' | 'progress' | 'direction' | 'rain' | 'rainTime' | 'aspect' | 'coverScale' | 'coverOffset', WebGLUniformLocation | null>
+  uniforms: Record<'from' | 'to' | 'mask' | 'seeds' | 'seedRows' | 'seedOffsets' | 'progress' | 'direction' | 'rain' | 'rainTime' | 'aspect' | 'coverScale' | 'coverOffset' | 'snapshot' | 'toSnapshot' | 'capture', WebGLUniformLocation | null>
   dispose: () => void
 }
 
@@ -221,14 +233,17 @@ function resize(runtime: StageRuntime) {
   gl.uniform1f(uniforms.aspect, viewAspect)
 }
 
-function draw(runtime: StageRuntime, progress: number) {
+function draw(runtime: StageRuntime, progress: number, capture = false) {
   const { gl, uniforms } = runtime
-  runtime.canvas.dataset.scene = runtime.scene
-  runtime.canvas.dataset.transition = String(runtime.running)
-  runtime.canvas.dataset.textureCount = String(runtime.target ? 4 : 3)
-  runtime.canvas.dataset.seedPhase = runtime.seedPhase.toFixed(5)
-  runtime.canvas.dataset.rain = runtime.rain.toFixed(3)
-  resize(runtime)
+  if (!capture) {
+    runtime.canvas.dataset.scene = runtime.scene
+    runtime.canvas.dataset.wanted = runtime.wanted
+    runtime.canvas.dataset.transition = String(runtime.running)
+    runtime.canvas.dataset.textureCount = String(runtime.target ? 4 : 3)
+    runtime.canvas.dataset.seedPhase = runtime.seedPhase.toFixed(5)
+    runtime.canvas.dataset.rain = runtime.rain.toFixed(3)
+    resize(runtime)
+  }
   gl.activeTexture(gl.TEXTURE0)
   gl.bindTexture(gl.TEXTURE_2D, runtime.current)
   gl.activeTexture(gl.TEXTURE1)
@@ -242,15 +257,61 @@ function draw(runtime: StageRuntime, progress: number) {
     const phase = index * 1.731
     const speed = 5 + index % 3
     // Evaluate once per seed per draw, rather than for every sky pixel.
-    runtime.seedOffsets[index * 2] = (Math.sin(runtime.seedPhase * speed + phase) - Math.sin(phase))
-      * (17 + index % 4 * 2) + Math.sin(runtime.seedPhase * 2) * 8
-    runtime.seedOffsets[index * 2 + 1] = (Math.sin(runtime.seedPhase * (speed + 1) + phase * .7) - Math.sin(phase * .7)) * 3
+    const seedPhase = capture ? runtime.presentedSeedPhase : runtime.seedPhase
+    runtime.seedOffsets[index * 2] = (Math.sin(seedPhase * speed + phase) - Math.sin(phase))
+      * (17 + index % 4 * 2) + Math.sin(seedPhase * 2) * 8
+    runtime.seedOffsets[index * 2 + 1] = (Math.sin(seedPhase * (speed + 1) + phase * .7) - Math.sin(phase * .7)) * 3
   }
   gl.uniform2fv(uniforms.seedOffsets, runtime.seedOffsets)
   gl.uniform1f(uniforms.progress, progress)
   gl.uniform1f(uniforms.rain, runtime.rain)
   gl.uniform1f(uniforms.rainTime, runtime.rainTime)
+  gl.uniform1f(uniforms.snapshot, runtime.fromSnapshot ? 1 : 0)
+  gl.uniform1f(uniforms.toSnapshot, runtime.fromSnapshot && !runtime.target ? 1 : 0)
+  gl.uniform1f(uniforms.capture, capture ? 1 : 0)
   gl.drawArrays(gl.TRIANGLES, 0, 3)
+  if (!capture) {
+    runtime.presentedProgress = progress
+    runtime.presentedSeedPhase = runtime.seedPhase
+  }
+}
+
+function captureCurrent(runtime: StageRuntime): WebGLTexture {
+  const { gl, uniforms, canvas } = runtime
+  const texture = gl.createTexture(), framebuffer = gl.createFramebuffer()
+  if (!texture || !framebuffer) {
+    gl.deleteTexture(texture); gl.deleteFramebuffer(framebuffer)
+    throw new Error('无法创建场景衔接资源')
+  }
+  // One GPU-only pass, at display resolution capped by the original image.
+  // A later interruption replaces this snapshot rather than retaining history.
+  const width = Math.max(1, Math.min(WIDTH, canvas.width))
+  const height = Math.max(1, Math.round(width * HEIGHT / WIDTH))
+  try {
+    gl.bindTexture(gl.TEXTURE_2D, texture)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0)
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('场景衔接缓冲不可用')
+    gl.viewport(0, 0, width, height)
+    gl.uniform2f(uniforms.coverScale, 1, 1)
+    gl.uniform2f(uniforms.coverOffset, 0, 0)
+    draw(runtime, runtime.presentedProgress, true)
+    if (gl.getError() !== gl.NO_ERROR) throw new Error('场景衔接合成失败')
+    canvas.dataset.snapshotBytes = String(width * height * 4)
+    return texture
+  } catch (error) {
+    gl.deleteTexture(texture)
+    throw error
+  } finally {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.deleteFramebuffer(framebuffer)
+    gl.viewport(0, 0, canvas.width, canvas.height)
+  }
 }
 
 async function createRuntime(canvas: HTMLCanvasElement, scene: StageKey, reduced: boolean, signal: AbortSignal): Promise<StageRuntime> {
@@ -290,6 +351,9 @@ async function createRuntime(canvas: HTMLCanvasElement, scene: StageKey, reduced
     seedRows: gl.getUniformLocation(program, 'seedRows'),
     seedOffsets: gl.getUniformLocation(program, 'seedOffsets[0]'),
     progress: gl.getUniformLocation(program, 'progress'),
+    snapshot: gl.getUniformLocation(program, 'fromSnapshot'),
+    toSnapshot: gl.getUniformLocation(program, 'toSnapshot'),
+    capture: gl.getUniformLocation(program, 'captureFrame'),
     direction: gl.getUniformLocation(program, 'direction'),
     rain: gl.getUniformLocation(program, 'rainAmount'),
     rainTime: gl.getUniformLocation(program, 'rainTime'),
@@ -315,12 +379,17 @@ async function createRuntime(canvas: HTMLCanvasElement, scene: StageKey, reduced
     lastDraw: 0,
     transitionStart: 0,
     current: makeTexture(gl, frame),
+    fromSnapshot: false,
+    presentedProgress: 1,
+    presentedSeedPhase: 0,
     target: null,
     scene,
     previous: scene,
     wanted: scene,
     running: false,
     loading: false,
+    loadController: null,
+    loadingScene: null,
     animation: 0,
     direction: 1,
     reduced,
@@ -331,6 +400,7 @@ async function createRuntime(canvas: HTMLCanvasElement, scene: StageKey, reduced
   canvas.dataset.seedCount = String(seedPatches.origins.length)
   seedImage.src = ''
   runtime.dispose = () => {
+    runtime.loadController?.abort()
     cancelAnimationFrame(runtime.animation)
     gl.deleteTexture(runtime.mask)
     gl.deleteTexture(runtime.seeds)
@@ -372,6 +442,8 @@ function finish(runtime: StageRuntime, signal: AbortSignal) {
     runtime.gl.deleteTexture(runtime.current)
     runtime.current = runtime.target
     runtime.target = null
+    runtime.fromSnapshot = false
+    runtime.canvas.dataset.snapshotBytes = '0'
   }
   runtime.running = false
   runtime.previous = runtime.scene
@@ -410,19 +482,37 @@ function startAir(runtime: StageRuntime, signal: AbortSignal) {
   runtime.animation = requestAnimationFrame(now => tickAir(runtime, signal, now))
 }
 
-async function playTransition(runtime: StageRuntime, requested: StageKey, reduced: boolean, signal: AbortSignal) {
+async function playTransition(runtime: StageRuntime, requested: StageKey, signal: AbortSignal) {
+  const controller = new AbortController()
+  runtime.loadController = controller
+  runtime.loadingScene = requested
   runtime.loading = true
-  const previous = runtime.scene
+  const abort = () => controller.abort()
+  signal.addEventListener('abort', abort, { once: true })
+  let image: HTMLImageElement | undefined
   try {
-    const image = await loadImage(sources[requested], signal)
-    if (signal.aborted) return
-    if (requested !== runtime.wanted) {
-      runtime.loading = false
-      void requestTransition(runtime, signal)
-      return
+    image = await loadImage(sources[requested], controller.signal)
+    if (signal.aborted || controller.signal.aborted || requested !== runtime.wanted) return
+    const previous = runtime.scene
+    if (runtime.running && runtime.target) {
+      if (idlePaused(runtime)) {
+        // Nothing is visible while hidden/reduced, so no handoff allocation.
+        runtime.gl.deleteTexture(runtime.current)
+        runtime.current = runtime.target
+        runtime.target = null
+        runtime.fromSnapshot = false
+      } else {
+        const snapshot = captureCurrent(runtime)
+        runtime.gl.deleteTexture(runtime.current)
+        runtime.gl.deleteTexture(runtime.target)
+        runtime.current = snapshot
+        runtime.target = null
+        runtime.fromSnapshot = true
+        runtime.canvas.dataset.interruptions = String(Number(runtime.canvas.dataset.interruptions ?? 0) + 1)
+      }
+      runtime.running = false
     }
     runtime.target = makeTexture(runtime.gl, image)
-    runtime.loading = false
     runtime.running = true
     runtime.previous = previous
     runtime.scene = requested
@@ -432,24 +522,40 @@ async function playTransition(runtime: StageRuntime, requested: StageKey, reduce
     runtime.transitionStart = performance.now()
     if (runtime.animation) cancelAnimationFrame(runtime.animation)
     runtime.animation = 0
-    if (reduced || idlePaused(runtime)) {
+    if (idlePaused(runtime)) {
       finish(runtime, signal)
       startAir(runtime, signal)
       return
     }
+    draw(runtime, 0)
     startAir(runtime, signal)
-    return
   } catch (error) {
-    if (!signal.aborted) console.warn(error)
+    if (!signal.aborted && !controller.signal.aborted) {
+      console.warn(error)
+      if (!document.hidden) draw(runtime, transitionProgress(runtime))
+    }
+  } finally {
+    if (image) image.src = ''
+    signal.removeEventListener('abort', abort)
+    // A cancelled load must not clear the state of its newer replacement.
+    if (runtime.loadController === controller) {
+      runtime.loadController = null
+      runtime.loadingScene = null
+      runtime.loading = false
+    }
   }
-  runtime.running = false
-  runtime.loading = false
-  if (!signal.aborted && runtime.wanted !== requested) void requestTransition(runtime, signal)
 }
 
 function requestTransition(runtime: StageRuntime, signal: AbortSignal): Promise<void> {
-  if (signal.aborted || runtime.wanted === runtime.scene || runtime.running || runtime.loading) return Promise.resolve()
-  return playTransition(runtime, runtime.wanted, runtime.reduced, signal)
+  if (signal.aborted) return Promise.resolve()
+  if (runtime.loadingScene !== runtime.wanted) {
+    runtime.loadController?.abort()
+    runtime.loadController = null
+    runtime.loadingScene = null
+    runtime.loading = false
+  }
+  if (runtime.wanted === runtime.scene || runtime.loading) return Promise.resolve()
+  return playTransition(runtime, runtime.wanted, signal)
 }
 
 export function LiveSceneStage({ scene, reduced, rain = 0 }: { scene: StageKey; reduced: boolean; rain?: number }) {

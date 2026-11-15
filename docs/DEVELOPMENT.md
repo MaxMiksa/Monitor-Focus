@@ -70,7 +70,7 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 - `frontend/src/index.css` 是唯一视觉参数入口；全局字号为正文／按钮 16px、小标题 18px、页面标题 26px，胶囊文字行高 1.25，固定面板不随字号或视口改变尺寸；组件复用 shadcn 风格控件、Lucide 图标和 Motion 短反馈。重大界面改动先生成效果图并取得确认，再用与当前源码一致的真实截图核对。
 - 快捷面板与设置页共用 1168 × 657 DIP（较上一版宽高再增约 10%；最小宽 1024 DIP） 的 16:9 客户区；`window_ratio_windows.go` 用 `WM_SIZING` 和窗口尺寸事件锁定比例，`main.go` 在首次显示及系统贴靠／最大化后恢复并居中。`resizePanel` 仅保留兼容动作，不再切换窗口尺寸。
 - `frontend/public/scenes/` 保存当前版早 / 中 / 傍晚 / 夜四张无文字、无组件的整页 16:9 原创 WebP；`frontend/public/scenes/live/` 保存新版同机位四张 WebP 和一张灰度权重 WebP。仅供开发使用的四张高清 PNG、v7 权重图和 `scene-motion-prototype.html` 留在 `frontend/public/`，Vite 构建结束阶段由 `excludeDevelopmentAssets` 插件从 `frontend/dist` 删除，不进入 exe。正式构建只嵌入场景资源；运行时不请求远程图片或视频，不引入视频解码依赖。真实控件由 React 绘制，避免图片中的按钮与可操作热区错位。
-- 新版舞台的 `LiveSceneStage` 默认启用，「设置 → 通用 → 主界面样式」可切回当前版；偏好存于 `localStorage` 并由 `storage` 事件同步，不进入 Go `Settings`、不改 Revision 或配置迁移。底图常态仅一张全尺寸画面、一张权重图和一张 640×320 飞絮天空补片图集；切换时临时多一张目标画面，完成后直接交换并释放旧纹理，不再重复上传。隐藏、减少动态效果时停止循环；WebGL 初始化失败释放上下文并按当前场景显示原始静态图。
+- 新版舞台的 `LiveSceneStage` 默认启用，「设置 → 通用 → 主界面样式」可切回当前版；偏好存于 `localStorage` 并由 `storage` 事件同步，不进入 Go `Settings`、不改 Revision 或配置迁移。底图常态仅一张全尺寸画面、一张权重图和一张 640×320 飞絮天空补片图集；切换时临时多一张目标画面，完成后直接交换并释放旧纹理。再次选场景时，GPU 将当前已显示的基础画面合成为一次性衔接纹理，再直接转向新目标；中断时最多三张场景纹理，完成后恢复一张，不保留历史快照。隐藏、减少动态效果时停止循环；WebGL 初始化失败释放上下文并按当前场景显示原始静态图。
 - `SkyEffects` 复用 `@pmndrs/vanilla` 1.25.0 的 `Clouds`／`Cloud`／`Stars` 与 Three.js 0.187.0，替代手写空气／星点程序。一个透明 WebGL2 画布、最多 72 个实例云片和 18,000 个星点（通过 drawRange 调数量），不逐帧重建几何体；新增可保存的旧版薄云增强，恢复原四层噪声与三层扭曲薄云，去除亮度／时段／遮罩的重复衰减，白色云光与浓度对比独立计算。云纹理 `cloud.png` 从上游固定提交本地打包，许可／来源纳入 notices，不请求 CDN。最高 20 fps，隐藏暂停，减少动态效果时只绘静态帧，卸载释放几何／纹理／材质／上下文；长期资源走势未验收。`sky-preference.ts` 校验并保存四场景偏好，纳入现有自动保存／撤销；天空编辑仅发临时画面预览事件，不发送硬件场景请求。当前版背景保留原样，打开天空编辑时临时预览新版舞台。TypeScript 显式映射 three 类型，兼容共享 pnpm store。
 - 飞絮由 `scripts/export-seed-patches.py` 离线制作局部补片，输出 `frontend/public/scenes/live/seed-sky-patches.png` 与 `frontend/src/lib/seed-patches.json`。不改原始 WebP；同一片元程序先补原位置，再从原图减去补片，搬移有符号细节，避免蓝色矩形边缘。10 个偏移量每次绘制计算一次，复用 80 字节数组，不逐像素算轨迹；独立 120 秒无缝时钟，不随场景切换重置。图集 RGB 上传数据 600 KiB，驱动实际内存另测；生成过程只依赖开发机 Python／Pillow／NumPy／OpenCV，产品不依赖它们。
 - 快捷面板的四颗按钮按场景名称显式映射早 / 中 / 傍晚 / 夜，不按目标小时就近取场景；无法识别的名称才按亮度兜底。浏览器示例数据与每日计划同步使用四个场景和四个节点。亮度滑条左端月亮、右端太阳，表示从暗到亮；更多控制只列出未映射到四颗按钮的场景。
@@ -104,4 +104,10 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 星星闪烁：star-twinkle.ts 仅适配pmndrs星点材质，初始化一次逐星相位／频率／幅度属性；取消默认共享尺寸脉冲，用独立明暗曲线保留星点形状。每帧只更新时间，闪烁滑条控制强度，0和减少动态效果常亮。云彩与旧版薄云不改。设置收起修正：clipPath完成收拢后才淡出，天空编辑内容不因open=false提前换页，关闭期间inert与pointer-events禁止操作。
 
-当前正式包 build/packages/20261116-010947-929；部署目标／专注与唯一自启见 star-settings-fix-20261116-update.json，独立曲线及界面验证见 build/diagnostics/star-settings-fix/。收起中间截图保留玻璃与原内容、终态opacity0且inert；仅作本次短验收，不代表长期性能或完整减少动态效果验证。
+## 连续场景过渡
+
+- `LiveSceneStage` 不再等待进行中或过时的加载结束：新目标取消旧图片加载，加载完成后再次核对最新目标；废弃请求不得清空新请求状态。中断时从最后已显示的进度与飞絮相位衔接，单次 GPU FBO 合成、不 `readPixels` 或 CPU 拷贝。
+- 纹理按显示宽度生成且不超过 1672×941，RGBA 快照理论上限约 6.29 MB；中断瞬时最多三张场景纹理，过渡两张、空闲一张，另有共用 mask／飞絮图集，不常驻四场景。雨景后处理不写入快照，飞絮只修补新目标；快照失败保留当前画面。隐藏或减少动态效果时直接切到目标；卸载取消加载并释放纹理与上下文。硬件请求仍串行，取消画面过渡不等于取消在途硬件调用。
+- 验收：快速三场景切换、真实 WebGL 晴天／雨天衔接与过时加载均通过，平均 8 位像素差 0.09～0.22，无 GL 错误；峰值 5、空闲 3、销毁 0 张纹理（均含共用 mask／图集）。证据为 `build/diagnostics/scene-interrupt/gpu-check.json`，正式构建日志见同目录 `production-build.log`。未验证长期 CPU／显存走势或所有机器的流畅度。
+
+当前正式包为 `build/packages/20261116-023317-887/`；部署目标／专注与唯一自启见 `build/diagnostics/scene-interrupt-20261116-update.json`。发布未夹带未完成的显示／恢复修改。
