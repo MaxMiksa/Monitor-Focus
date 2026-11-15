@@ -84,6 +84,8 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 ## 开发验收原则
 
+雨效选型预览位于 `scripts/rain-preview/`，`npm ci --ignore-scripts` 后 `npm start`，仅在 `127.0.0.1:5194` 提供浏览器页面；不进入正式前端或 exe，不接硬件／天气。锁定 tsParticles 4.5.3 与 three.quarks 0.17.1，五种配置共用同一场景、0–100 雨量、30 fps 上限、原景对照／暂停／纯净观景；只运行当前候选，切换销毁画布与计时器，隐藏暂停。选择仅写预览独立偏好，最终接入与原生内存对比待用户选定后开展。已验证五款切换均只有一个画布且无控制台错误；这不等于已测正式版总内存。
+
 天气雨景：`frontend/src/lib/weather.ts` 只在面板实时舞台中请求固定 HTTPS `api.open-meteo.com`／`geocoding-api.open-meteo.com`，生产 CSP 仅增加这两个连接来源；不经过硬件串行队列、不增加 Go 后台轮询。请求 10 秒超时、64 KiB 响应上限、禁凭据／跳转，校验城市坐标、当前天气字段／代码／时间；15 分钟刷新，30 分钟到期停止沿用缓存，隐藏取消请求，卸载取消定时器及请求。`weather-settings.tsx` 负责搜索／选择和临时预览，偏好纳入 `settings-history.ts`。雨丝直接并入 `LiveSceneStage` 原片元程序，复用现有纹理／画布／时钟，雨天最高 24 fps（场景切换仍最多 30 fps），减少动态效果时仅静态绘制。未引入视频、雨景图集或额外依赖；生成效果图仅用于设计确认，不进入发布资源。
 
 雨景验收证据：`build/diagnostics/weather-state-checks.json` 覆盖雨／无雨、错误天气代码、15 分钟刷新、30 分钟缓存过期、隐藏暂停及卸载清理；`weather-rain-memory.json` 是相同正式 exe 在原生 WebView2、mock 硬件隔离下所有自有进程的短时对照。热态关闭／开启雨丝的 Private Bytes 中位数约 418.95／413.59 MB，专用工作集约 185.71／186.08 MB；这说明本次未见超出进程波动的明确雨景增量，不代表雨景能省内存或长期无泄漏，也未测独立显存。该样本不含另外开发中的新天空组件，不能当作联合版的整体占用结论。

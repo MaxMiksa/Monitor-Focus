@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>雨景试映 · Monitors Focus</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main>
+    <section id="stage" aria-label="雨景动态预览">
+      <div id="backdrop"></div><div id="atmosphere"></div><div id="effect"></div>
+      <header><div><span class="eyebrow">MONITORS FOCUS / RAIN STUDY</span><h1>挑一场喜欢的雨。</h1></div><button id="clean" class="glass" aria-pressed="false">纯净观景</button></header>
+      <div class="scene-switch glass" role="group" aria-label="背景时段">
+        <button data-scene="morning">早晨</button><button data-scene="midday" aria-pressed="true">中午</button><button data-scene="dusk">傍晚</button><button data-scene="night">夜间</button>
+      </div>
+      <div class="stage-caption"><span id="current-title">03 · 立体自然雨</span><span id="render-status" role="status">正在准备雨景…</span></div>
+    </section>
+    <section class="controls" aria-label="雨景选择">
+      <div class="toolbar"><div><span class="eyebrow">LIVE PREVIEW</span><h2>同一片草坡，五种雨感。</h2></div><div class="playback"><button id="baseline" aria-pressed="false">原景对照</button><button id="pause" aria-pressed="false">暂停</button></div></div>
+      <div class="choices" role="group" aria-label="选择雨景风格"></div>
+      <div class="bottom-row">
+        <div class="intensity"><div class="range-label"><label for="intensity">雨量</label><output id="intensity-value" for="intensity">45 · 中雨</output></div><input id="intensity" type="range" min="0" max="100" value="45" /><div class="steps"><button data-intensity="18">小雨</button><button data-intensity="45">中雨</button><button data-intensity="85">大雨</button></div></div>
+        <div class="selection"><span id="description">远近三层，细雨有空间。</span><a id="source" href="https://github.com/Alchemist0823/three.quarks" target="_blank" rel="noreferrer">组件来源 ↗</a><button id="choose">记住这一款</button><output id="chosen" role="status"></output></div>
+      </div>
+    </section>
+  </main>
+  <button id="restore" class="glass" hidden>显示选择栏</button>
+  <script type="module" src="/main.js"></script>
+</body>
+</html>
