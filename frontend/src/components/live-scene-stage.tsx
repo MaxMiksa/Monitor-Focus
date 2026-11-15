@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import type { StageKey } from '@/components/scene-panel'
-import { AIR_OPACITY_EVENT, readAirOpacity } from '@/lib/stage-preference'
 import seedPatches from '@/lib/seed-patches.json'
 
 const WIDTH = 1672
@@ -35,56 +34,6 @@ const AIR_PROFILES = {
 } as const
 const TAU = Math.PI * 2
 const MAX_FPS = 30
-const NOISE_SIZE = 128
-const canvasNoiseBytes = new WeakMap<HTMLCanvasElement, number>()
-    function seededRandom(seed: number) {
-      let value = seed >>> 0;
-      return () => {
-        value = (Math.imul(value, 1664525) + 1013904223) >>> 0;
-        return value / 4294967296;
-      };
-    }
-
-    // Small periodic value-noise tile; no image sequence and no runtime blur.
-    function makeNoiseData(size: number) {
-      const random = seededRandom(20261114);
-      const octaves = [4, 7, 13, 29].map((cells, index) => {
-        const lattice = new Float32Array(cells * cells);
-        for (let i = 0; i < lattice.length; i += 1) lattice[i] = random();
-        return { cells, lattice, weight: [.42, .28, .18, .12][index] };
-      });
-      function sample(octave: { cells: number; lattice: Float32Array; weight: number }, x: number, y: number) {
-        const cells = octave.cells;
-        const gx = x * cells;
-        const gy = y * cells;
-        const ix = Math.floor(gx);
-        const iy = Math.floor(gy);
-        const tx = gx - ix;
-        const ty = gy - iy;
-        const u = tx * tx * (3 - 2 * tx);
-        const v = ty * ty * (3 - 2 * ty);
-        const x0 = ((ix % cells) + cells) % cells;
-        const y0 = ((iy % cells) + cells) % cells;
-        const x1 = (x0 + 1) % cells;
-        const y1 = (y0 + 1) % cells;
-        const a = octave.lattice[y0 * cells + x0] * (1 - u) + octave.lattice[y0 * cells + x1] * u;
-        const b = octave.lattice[y1 * cells + x0] * (1 - u) + octave.lattice[y1 * cells + x1] * u;
-        return a * (1 - v) + b * v;
-      }
-      const data = new Uint8Array(size * size);
-      for (let y = 0; y < size; y += 1) {
-        for (let x = 0; x < size; x += 1) {
-          const nx = (x + .5) / size;
-          const ny = (y + .5) / size;
-          let value = 0;
-          for (const octave of octaves) value += sample(octave, nx, ny) * octave.weight;
-          value = Math.max(0, Math.min(1, .5 + (value - .5) * 1.55));
-          data[y * size + x] = Math.round(value * 255);
-        }
-      }
-      return data;
-    }
-
 // Original seed detail moves by signed difference against tiny offline sky patches.
 const fragmentSource = `
   #ifdef GL_FRAGMENT_PRECISION_HIGH
@@ -95,23 +44,30 @@ const fragmentSource = `
   uniform sampler2D fromFrame;
   uniform sampler2D toFrame;
   uniform sampler2D regionMask;
-  uniform sampler2D airNoise;
   uniform sampler2D seedPatches;
   uniform vec2 seedRows;
   uniform vec2 seedOffsets[${seedPatches.origins.length}];
   uniform float progress;
   uniform float direction;
-  uniform float airPhase;
-  uniform float airOpacity;
+  uniform float rainAmount;
+  uniform float rainTime;
+  uniform float viewAspect;
   uniform vec2 coverScale;
   uniform vec2 coverOffset;
-  uniform vec4 airFrom;
-  uniform vec4 airTo;
-  uniform vec3 tintFrom;
-  uniform vec3 tintTo;
   varying vec2 uv;
   float ease(float x) { return x * x * (3.0 - 2.0 * x); }
   float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float rainLayer(vec2 p, vec2 grid, float speed, float seed) {
+    p.x += p.y * .16;
+    p.y -= rainTime * speed;
+    vec2 cell = floor(p * grid);
+    vec2 f = fract(p * grid);
+    float random = hash21(cell + seed);
+    float center = .15 + .7 * hash21(cell + seed + 19.0);
+    float line = 1.0 - smoothstep(.012, .055, abs(f.x - center));
+    float streak = smoothstep(.05, .18, f.y) * (1.0 - smoothstep(.45, .85, f.y));
+    return line * streak * step(.83 - rainAmount * .24, random);
+  }
   const vec2 imageSize = vec2(${seedPatches.imageSize.join('.0, ')}.0);
   const vec2 seedCell = vec2(${seedPatches.cellSize.join('.0, ')}.0);
   const vec2 seedAtlasSize = vec2(${seedPatches.atlasSize.join('.0, ')}.0);
@@ -137,36 +93,15 @@ const fragmentSource = `
       b += texture2D(toFrame, originalUv).rgb - seedSky(p, index, seedRows.y);
     }
   }
-  float veilLayer(vec2 p, float phase, float seed, float harmonic) {
-    float a = phase * harmonic + seed;
-    vec2 orbit = vec2(sin(a), cos(a + seed * .31)) * .035;
-    vec2 warpUv = p * .43 + vec2(.17 + seed * .07, .61 - seed * .05) + orbit * .45;
-    vec2 warp = vec2(texture2D(airNoise, warpUv).r, texture2D(airNoise, warpUv + vec2(.27, .43) - orbit * .30).r) - .5;
-    float stretch = 1.0 + .13 * sin(a + 1.1);
-    float gather = .38 + .13 * sin(a * 2.0 + seed) + .07 * cos(a + p.x * 3.1);
-    vec2 q = (p + warp * (.14 + .060 * sin(a * 3.0))) * stretch + orbit;
-    float n = texture2D(airNoise, q).r;
-    float shape = smoothstep(gather, gather + .44, n);
-    float veil = .30 + .70 * smoothstep(.08, .72, shape);
-    float transmittance = .74 + .26 * sin(phase * (harmonic + 2.0) + p.x * 4.0 + p.y * 6.0 + seed);
-    float dissolve = .76 + .24 * sin(phase * (harmonic + 1.0) + p.y * 2.2 - seed);
-    return veil * transmittance * dissolve;
-  }
-  float starAt(vec2 p, float phase) {
-    vec2 grid = vec2(29.0, 16.0);
-    vec2 cell = floor(p * grid), f = fract(p * grid);
-    float a = hash21(cell + vec2(11.3, 7.1)), b = hash21(cell + vec2(41.7, 23.9)), c = hash21(cell + vec2(83.2, 61.4));
-    vec2 center = vec2(.18 + .64 * a, .18 + .64 * b);
-    float d = length((f - center) * vec2(1.15, 1.0));
-    return exp(-d * d * 280.0) * step(.958, c) * (.78 + .22 * sin(phase * 2.0 + a * 6.2831853));
-  }
   void main() {
     vec2 imageUv = clamp(uv * coverScale + coverOffset, 0.0, 1.0);
     vec3 fromColor = texture2D(fromFrame, imageUv).rgb;
     vec3 toColor = texture2D(toFrame, imageUv).rgb;
     vec2 imagePixel = imageUv * imageSize;
     ${seedCalls('clearSeed')}
-    ${seedCalls('driftSeed')}
+    if (rainAmount < .01) {
+      ${seedCalls('driftSeed')}
+    }
     float difference = length(toColor - fromColor) / 1.732;
     float region = texture2D(regionMask, imageUv).r;
     float detail = difference * .28;
@@ -180,33 +115,16 @@ const fragmentSource = `
     float highlight = sin(progress * 3.14159) * difference * region * .018;
     color += vec3(highlight * .85, highlight, highlight * 1.15);
 
-    float airBlend = ease(clamp((progress - .035) / .58, 0.0, 1.0));
-    vec4 air = mix(airFrom, airTo, airBlend);
-    air.x = airOpacity;
-    vec3 tint = mix(tintFrom, tintTo, airBlend);
-    float side = abs((imageUv.x - .5) * 2.0);
-    float horizon = .655 + .066 * pow(side, 1.45);
-    float sky = 1.0 - smoothstep(horizon - .20, horizon + .006, imageUv.y);
-    float centerCalm = exp(-pow((imageUv.x - .5) / .205, 2.0) - pow((imageUv.y - .545) / .235, 2.0));
-    float seedCalm = exp(-pow((imageUv.y - .615) / .115, 2.0)) * (1.0 - smoothstep(.10, .55, abs(imageUv.x - .5)));
-    float luma = dot(color, vec3(.2126, .7152, .0722));
-    float brightGuard = 1.0 - .72 * smoothstep(.70, .95, luma);
-    float area = sky * brightGuard * (1.0 - .70 * centerCalm) * (1.0 - .30 * seedCalm);
-    vec2 p1 = vec2(imageUv.x * 1.42 + imageUv.y * .31, imageUv.y * 5.8 - imageUv.x * .18) + vec2(.12, .27);
-    vec2 p2 = mat2(.93, -.36, .36, .93) * vec2(imageUv.x * 2.15 - imageUv.y * .44, imageUv.y * 8.0 + imageUv.x * .26) + vec2(.47, .13);
-    vec2 p3 = mat2(.80, .60, -.60, .80) * vec2(imageUv.x * 2.85 + imageUv.y * .55, imageUv.y * 10.6 - imageUv.x * .33) + vec2(.71, .63);
-    float w1 = veilLayer(p1, airPhase, .7, 1.0), w2 = veilLayer(p2, airPhase, 2.4, 2.0), w3 = veilLayer(p3, airPhase, 4.1, 3.0);
-    float breath = .82 + .30 * (.5 + .5 * sin(airPhase + p1.y * .21)) + .07 * sin(airPhase * 2.0 - p2.x * .34);
-    float wisps = clamp((w1 * .46 + w2 * .33 + w3 * .21) * breath, 0.0, 1.0);
-    vec3 airColor = mix(color, tint * (.58 + .42 * luma) * air.z, .58);
-    float daylight = 1.0 - clamp(air.y / .86, 0.0, 1.0);
-    float density = clamp(air.x * area * wisps * daylight, 0.0, 1.0);
-    float softShade = 1.0 - smoothstep(.30, .78, wisps) * .018 * area * daylight;
-    color = mix(color * softShade, airColor, density);
-    float goldEdge = area * smoothstep(.15, .55, wisps) * (1.0 - smoothstep(.55, .95, wisps));
-    color += tint * vec3(air.w, air.w * .55, air.w * .12) * goldEdge * .004;
-    float starSky = sky * (1.0 - smoothstep(.34, .62, imageUv.y)) * (1.0 - .75 * centerCalm) * smoothstep(.015, .09, imageUv.y);
-    color += vec3(.55, .68, .94) * starAt(imageUv, airPhase) * starSky * air.y * .055;
+    if (rainAmount > .001) {
+      float sky = clamp((region * 255.0 - 166.0) / 38.0, 0.0, 1.0);
+      float grey = dot(color, vec3(.2126, .7152, .0722));
+      color = mix(color, vec3(grey) * vec3(.91, .97, 1.02), rainAmount * .22);
+      color *= 1.0 - rainAmount * (.06 + sky * .19);
+      vec2 rainUv = vec2(uv.x * viewAspect, uv.y);
+      float streaks = rainLayer(rainUv, vec2(73.0, 17.0), .39, 3.7) * .17
+        + rainLayer(rainUv + vec2(.31, .19), vec2(111.0, 23.0), .26, 47.1) * .075;
+      color += vec3(.76, .85, .94) * streaks * rainAmount * (.4 + .6 * sqrt(grey));
+    }
     gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
   }
 `
@@ -229,24 +147,6 @@ function loadImage(url: string, signal: AbortSignal): Promise<HTMLImageElement> 
   })
 }
 
-function createNoiseTexture(gl: WebGLRenderingContext): WebGLTexture {
-  const texture = gl.createTexture()
-  if (!texture) throw new Error('无法创建空气层纹理')
-  gl.activeTexture(gl.TEXTURE3)
-  gl.bindTexture(gl.TEXTURE_2D, texture)
-  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-  const noiseData = makeNoiseData(NOISE_SIZE)
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, NOISE_SIZE, NOISE_SIZE, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, noiseData)
-  if (gl.getError() !== gl.NO_ERROR) { gl.deleteTexture(texture); throw new Error('空气层纹理上传失败') }
-  canvasNoiseBytes.set(gl.canvas as HTMLCanvasElement, noiseData.byteLength)
-  return texture
-}
-
 function compile(gl: WebGLRenderingContext, type: number, source: string) {
   const shader = gl.createShader(type)
   if (!shader) throw new Error('无法创建场景着色器')
@@ -266,19 +166,14 @@ type StageRuntime = {
   program: WebGLProgram
   buffer: WebGLBuffer
   mask: WebGLTexture
-  noise: WebGLTexture
   seeds: WebGLTexture
   seedPhase: number
   seedOffsets: Float32Array
-  airOpacity: number
-  airPhase: number
-  periodNow: number
-  periodTarget: number
+  rain: number
+  rainTime: number
   lastTick: number
   lastDraw: number
   transitionStart: number
-  starsFrom: number
-  starsTo: number
   current: WebGLTexture
   target: WebGLTexture | null
   scene: StageKey
@@ -289,7 +184,7 @@ type StageRuntime = {
   animation: number
   direction: number
   reduced: boolean
-  uniforms: Record<'from' | 'to' | 'mask' | 'noise' | 'seeds' | 'seedRows' | 'seedOffsets' | 'progress' | 'direction' | 'phase' | 'opacity' | 'coverScale' | 'coverOffset' | 'airFrom' | 'airTo' | 'tintFrom' | 'tintTo', WebGLUniformLocation | null>
+  uniforms: Record<'from' | 'to' | 'mask' | 'seeds' | 'seedRows' | 'seedOffsets' | 'progress' | 'direction' | 'rain' | 'rainTime' | 'aspect' | 'coverScale' | 'coverOffset', WebGLUniformLocation | null>
   dispose: () => void
 }
 
@@ -323,14 +218,16 @@ function resize(runtime: StageRuntime) {
   const scaleY = viewAspect > imageAspect ? imageAspect / viewAspect : 1
   gl.uniform2f(uniforms.coverScale, scaleX, scaleY)
   gl.uniform2f(uniforms.coverOffset, (1 - scaleX) * .5, (1 - scaleY) * .5)
+  gl.uniform1f(uniforms.aspect, viewAspect)
 }
 
 function draw(runtime: StageRuntime, progress: number) {
   const { gl, uniforms } = runtime
   runtime.canvas.dataset.scene = runtime.scene
   runtime.canvas.dataset.transition = String(runtime.running)
-  runtime.canvas.dataset.textureCount = String(runtime.target ? 5 : 4)
+  runtime.canvas.dataset.textureCount = String(runtime.target ? 4 : 3)
   runtime.canvas.dataset.seedPhase = runtime.seedPhase.toFixed(5)
+  runtime.canvas.dataset.rain = runtime.rain.toFixed(3)
   resize(runtime)
   gl.activeTexture(gl.TEXTURE0)
   gl.bindTexture(gl.TEXTURE_2D, runtime.current)
@@ -339,8 +236,6 @@ function draw(runtime: StageRuntime, progress: number) {
   gl.activeTexture(gl.TEXTURE2)
   gl.bindTexture(gl.TEXTURE_2D, runtime.mask)
   gl.activeTexture(gl.TEXTURE3)
-  gl.bindTexture(gl.TEXTURE_2D, runtime.noise)
-  gl.activeTexture(gl.TEXTURE4)
   gl.bindTexture(gl.TEXTURE_2D, runtime.seeds)
   gl.uniform2f(uniforms.seedRows, seedPatches.scenes.indexOf(runtime.previous), seedPatches.scenes.indexOf(runtime.scene))
   for (let index = 0; index < seedPatches.origins.length; index += 1) {
@@ -353,12 +248,8 @@ function draw(runtime: StageRuntime, progress: number) {
   }
   gl.uniform2fv(uniforms.seedOffsets, runtime.seedOffsets)
   gl.uniform1f(uniforms.progress, progress)
-  gl.uniform1f(uniforms.phase, runtime.airPhase)
-  gl.uniform1f(uniforms.opacity, runtime.airOpacity)
-  gl.uniform4f(uniforms.airFrom, 0, runtime.starsFrom, AIR_PROFILES[runtime.previous].gain, AIR_PROFILES[runtime.previous].gold)
-  gl.uniform4f(uniforms.airTo, 0, runtime.starsTo, AIR_PROFILES[runtime.scene].gain, AIR_PROFILES[runtime.scene].gold)
-  gl.uniform3fv(uniforms.tintFrom, AIR_PROFILES[runtime.previous].tint)
-  gl.uniform3fv(uniforms.tintTo, AIR_PROFILES[runtime.scene].tint)
+  gl.uniform1f(uniforms.rain, runtime.rain)
+  gl.uniform1f(uniforms.rainTime, runtime.rainTime)
   gl.drawArrays(gl.TRIANGLES, 0, 3)
 }
 
@@ -395,47 +286,34 @@ async function createRuntime(canvas: HTMLCanvasElement, scene: StageKey, reduced
     from: gl.getUniformLocation(program, 'fromFrame'),
     to: gl.getUniformLocation(program, 'toFrame'),
     mask: gl.getUniformLocation(program, 'regionMask'),
-    noise: gl.getUniformLocation(program, 'airNoise'),
     seeds: gl.getUniformLocation(program, 'seedPatches'),
     seedRows: gl.getUniformLocation(program, 'seedRows'),
     seedOffsets: gl.getUniformLocation(program, 'seedOffsets[0]'),
     progress: gl.getUniformLocation(program, 'progress'),
     direction: gl.getUniformLocation(program, 'direction'),
-    phase: gl.getUniformLocation(program, 'airPhase'),
-    opacity: gl.getUniformLocation(program, 'airOpacity'),
+    rain: gl.getUniformLocation(program, 'rainAmount'),
+    rainTime: gl.getUniformLocation(program, 'rainTime'),
+    aspect: gl.getUniformLocation(program, 'viewAspect'),
     coverScale: gl.getUniformLocation(program, 'coverScale'),
     coverOffset: gl.getUniformLocation(program, 'coverOffset'),
-    airFrom: gl.getUniformLocation(program, 'airFrom'),
-    airTo: gl.getUniformLocation(program, 'airTo'),
-    tintFrom: gl.getUniformLocation(program, 'tintFrom'),
-    tintTo: gl.getUniformLocation(program, 'tintTo'),
   }
   gl.uniform1i(uniforms.from, 0)
   gl.uniform1i(uniforms.to, 1)
   gl.uniform1i(uniforms.mask, 2)
-  gl.uniform1i(uniforms.noise, 3)
-  gl.uniform1i(uniforms.seeds, 4)
+  gl.uniform1i(uniforms.seeds, 3)
   gl.uniform1f(uniforms.direction, 1)
-  gl.uniform1f(uniforms.opacity, readAirOpacity())
 
-  const noise = createNoiseTexture(gl)
-  canvas.dataset.airNoiseBytes = String(canvasNoiseBytes.get(canvas) ?? 0)
   const runtime: StageRuntime = {
     gl, canvas, program, buffer,
     mask: makeTexture(gl, maskImage),
-    noise,
     seeds: makeTexture(gl, seedImage),
     seedPhase: 0,
     seedOffsets: new Float32Array(seedPatches.origins.length * 2),
-    airOpacity: readAirOpacity(),
-    airPhase: .62,
-    periodNow: AIR_PROFILES[scene].period,
-    periodTarget: AIR_PROFILES[scene].period,
+    rain: 0,
+    rainTime: 0,
     lastTick: 0,
     lastDraw: 0,
     transitionStart: 0,
-    starsFrom: 0,
-    starsTo: scene === 'night' ? .86 : 0,
     current: makeTexture(gl, frame),
     target: null,
     scene,
@@ -455,7 +333,6 @@ async function createRuntime(canvas: HTMLCanvasElement, scene: StageKey, reduced
   runtime.dispose = () => {
     cancelAnimationFrame(runtime.animation)
     gl.deleteTexture(runtime.mask)
-    gl.deleteTexture(runtime.noise)
     gl.deleteTexture(runtime.seeds)
     gl.deleteTexture(runtime.current)
     if (runtime.target) gl.deleteTexture(runtime.target)
@@ -473,12 +350,6 @@ async function createRuntime(canvas: HTMLCanvasElement, scene: StageKey, reduced
     if (idlePaused(runtime)) { stopAir(runtime); if (runtime.running) finish(runtime, signal) }
     else startAir(runtime, signal)
   }, { signal })
-  const opacityChanged = () => {
-    runtime.airOpacity = readAirOpacity()
-    if (!signal.aborted && !document.hidden) draw(runtime, transitionProgress(runtime))
-  }
-  window.addEventListener(AIR_OPACITY_EVENT, opacityChanged, { signal })
-  window.addEventListener('storage', opacityChanged, { signal })
   return runtime
   } catch (error) {
     gl.getExtension('WEBGL_lose_context')?.loseContext()
@@ -504,7 +375,6 @@ function finish(runtime: StageRuntime, signal: AbortSignal) {
   }
   runtime.running = false
   runtime.previous = runtime.scene
-  runtime.starsFrom = runtime.starsTo
   if (!signal.aborted && !document.hidden) draw(runtime, 1)
   if (!signal.aborted && runtime.wanted !== runtime.scene) {
     void requestTransition(runtime, signal)
@@ -519,10 +389,10 @@ function tickAir(runtime: StageRuntime, signal: AbortSignal, now: number) {
   if (signal.aborted || idlePaused(runtime)) { runtime.animation = 0; return }
   const delta = Math.min((now - runtime.lastTick) / 1000, .2)
   runtime.lastTick = now
-  runtime.periodNow += (runtime.periodTarget - runtime.periodNow) * (1 - Math.exp(-delta / .45))
-  runtime.airPhase = (runtime.airPhase + delta * TAU / runtime.periodNow) % TAU
   runtime.seedPhase = (runtime.seedPhase + delta * TAU / 120) % TAU
-  const interval = 1000 / Math.min(MAX_FPS, runtime.running ? MAX_FPS : AIR_PROFILES[runtime.scene].idleFps)
+  // Both layer speeds make an integer number of grid cells in 1000 seconds.
+  runtime.rainTime = (runtime.rainTime + delta) % 1000
+  const interval = 1000 / Math.min(MAX_FPS, runtime.running ? MAX_FPS : runtime.rain > 0 ? 24 : AIR_PROFILES[runtime.scene].idleFps)
   if (now - runtime.lastDraw >= interval - 1) {
     if (runtime.lastDraw) runtime.canvas.dataset.airMeasuredFps = (1000 / Math.max(now - runtime.lastDraw, 1)).toFixed(1)
     runtime.lastDraw = now
@@ -556,9 +426,6 @@ async function playTransition(runtime: StageRuntime, requested: StageKey, reduce
     runtime.running = true
     runtime.previous = previous
     runtime.scene = requested
-    runtime.starsFrom = previous === 'night' ? .86 : 0
-    runtime.starsTo = requested === 'night' ? .86 : 0
-    runtime.periodTarget = AIR_PROFILES[requested].period
     const order = ['morning', 'midday', 'dusk', 'night']
     runtime.direction = order.indexOf(requested) > order.indexOf(previous) ? 1 : -1
     runtime.gl.uniform1f(runtime.uniforms.direction, runtime.direction)
@@ -585,12 +452,12 @@ function requestTransition(runtime: StageRuntime, signal: AbortSignal): Promise<
   return playTransition(runtime, runtime.wanted, runtime.reduced, signal)
 }
 
-export function LiveSceneStage({ scene, reduced }: { scene: StageKey; reduced: boolean }) {
+export function LiveSceneStage({ scene, reduced, rain = 0 }: { scene: StageKey; reduced: boolean; rain?: number }) {
   const [unavailable, setUnavailable] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const runtimeRef = useRef<StageRuntime | null>(null)
   const signalRef = useRef<AbortController | null>(null)
-  const latestRef = useRef({ scene, reduced })
+  const latestRef = useRef({ scene, reduced, rain })
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -603,6 +470,8 @@ export function LiveSceneStage({ scene, reduced }: { scene: StageKey; reduced: b
       if (!live || controller.signal.aborted) { runtime.dispose(); return }
       runtimeRef.current = runtime
       runtime.reduced = latestRef.current.reduced
+      runtime.rain = latestRef.current.rain
+      if (!document.hidden) draw(runtime, transitionProgress(runtime))
       runtime.wanted = latestRef.current.scene
       if (idlePaused(runtime)) stopAir(runtime)
       void requestTransition(runtime, controller.signal)
@@ -623,16 +492,18 @@ export function LiveSceneStage({ scene, reduced }: { scene: StageKey; reduced: b
   }, [])
 
   useEffect(() => {
-    latestRef.current = { scene, reduced }
+    latestRef.current = { scene, reduced, rain }
     const runtime = runtimeRef.current
     const signal = signalRef.current?.signal
     if (!runtime || !signal) return
     runtime.reduced = reduced
+    runtime.rain = Math.max(0, Math.min(1, rain))
+    if (!document.hidden) draw(runtime, transitionProgress(runtime))
     runtime.wanted = scene
     if (idlePaused(runtime)) { stopAir(runtime); if (runtime.running) finish(runtime, signal) }
     else startAir(runtime, signal)
     void requestTransition(runtime, signal)
-  }, [scene, reduced])
+  }, [scene, reduced, rain])
 
   return <canvas ref={canvasRef} className={`live-stage-canvas${unavailable ? ' live-stage-unavailable' : ''}`} style={unavailable ? { backgroundImage: `url('${sources[scene]}')` } : undefined} aria-hidden="true" />
 }

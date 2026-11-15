@@ -7,6 +7,9 @@ import { Slider } from '@/components/ui/slider'
 import { useI18n } from '@/lib/i18n-context'
 import { useSceneBarStyle, useStageStyle } from '@/lib/stage-preference'
 import { LiveSceneStage } from '@/components/live-scene-stage'
+import { useWeatherRain } from '@/lib/weather'
+import { SkyEffects } from '@/components/sky-effects'
+import { SKY_PREVIEW_EVENT, skyScenes } from '@/lib/sky-preference'
 import type { Display, Snapshot } from '@/lib/control'
 import type { Send } from '@/App'
 
@@ -114,7 +117,17 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
   const reduced = useReducedMotion()
   const [style] = useStageStyle()
   const [barStyle] = useSceneBarStyle()
-  const live = style === 'live'
+  const [skyPreview, setSkyPreview] = useState<StageKey | null>(null)
+  useEffect(() => {
+    const listener = (event: Event) => {
+      const value = (event as CustomEvent).detail
+      setSkyPreview(skyScenes.includes(value) ? value : null)
+    }
+    window.addEventListener(SKY_PREVIEW_EVENT, listener)
+    return () => window.removeEventListener(SKY_PREVIEW_EVENT, listener)
+  }, [])
+  const live = style === 'live' || (settingsOpen && skyPreview !== null)
+  const rain = useWeatherRain(live)
   const fullBarOpen = !live && !settingsOpen
   const ids = useMemo(() => inferSceneKeys(snapshot), [snapshot])
   const sourceScene = useMemo(() => inferSceneFromSource(snapshot, ids), [snapshot, ids])
@@ -216,14 +229,15 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
   }, [change, scene, settingsOpen, openSettings])
 
   const displays = snapshot.Displays.slice(0, 2)
-  const caption = stageNames[stage]
-  return <div className="scene-shell" data-scene={stage} data-stage={style} data-settings-open={settingsOpen}>
+  const visibleStage = settingsOpen && skyPreview ? skyPreview : stage
+  const caption = stageNames[visibleStage]
+  return <div className="scene-shell" data-scene={visibleStage} data-stage={live ? 'live' : 'classic'} data-settings-open={settingsOpen}>
     <div className="scene-backdrop" aria-hidden="true">
-      {live ? <LiveSceneStage key="live" scene={stage} reduced={!!reduced} /> : (Object.keys(sceneAssets) as StageKey[]).map(key => <div key={key} className="scene-image" data-active={stage === key} style={{ backgroundImage: `url('${sceneAssets[key]}')` }} />)}
+      {live ? <><LiveSceneStage key="live" scene={visibleStage} reduced={!!reduced} rain={rain} /><SkyEffects scene={visibleStage} reduced={!!reduced} /></> : (Object.keys(sceneAssets) as StageKey[]).map(key => <div key={key} className="scene-image" data-active={stage === key} style={{ backgroundImage: `url('${sceneAssets[key]}')` }} />)}
     </div>
     <div className="window-drag-region" data-app-region="drag" aria-hidden="true" />
     <div className="scene-wash" aria-hidden="true" />
-    {live && !reduced && <div className="live-stage-breath" aria-hidden="true" data-scene={stage} />}
+    {live && !reduced && <div className="live-stage-breath" aria-hidden="true" data-scene={visibleStage} />}
     <h1 className="scene-title" aria-live="polite">{caption}</h1>
     <AnimatePresence mode="wait" initial={false}>
       {!live && !reduced && <motion.div key={transition} className="scene-kinetic" aria-hidden="true" initial={{ opacity: 0, filter: 'blur(14px)', letterSpacing: '.02em' }} animate={{ opacity: [0, .18, 0], filter: ['blur(14px)', 'blur(0px)', 'blur(10px)'], letterSpacing: ['.02em', '.08em', '.32em'] }} exit={{ opacity: 0 }} transition={{ duration: 1.05, ease: [.2, .7, .2, 1] }}>{caption}</motion.div>}

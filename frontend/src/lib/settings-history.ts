@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Settings, Snapshot } from './control'
 import type { Send } from '@/App'
 import { readAirOpacity, readSceneBarStyle, readStageStyle, writeAirOpacity, writeSceneBarStyle, writeStageStyle } from './stage-preference'
+import { readSkyPreferences, writeSkyPreferences } from './sky-preference'
+import { readWeatherPreference, writeWeatherPreference } from './weather'
 
 function createDraft(settings: Settings) {
   return {
     ...structuredClone(settings),
     Schedule: settings.Schedule.map(point => ({ ...point, key: crypto.randomUUID() })),
-    appearance: { stage: readStageStyle(), bar: readSceneBarStyle(), air: Math.round(readAirOpacity() * 100) },
+    appearance: { stage: readStageStyle(), bar: readSceneBarStyle(), air: Math.round(readAirOpacity() * 100), sky: readSkyPreferences(), weather: readWeatherPreference() },
   }
 }
 type Draft = ReturnType<typeof createDraft>
@@ -46,6 +48,8 @@ export function useSettingsHistory(snapshot: Snapshot, send: Send) {
       writeStageStyle(next.present.appearance.stage)
       writeSceneBarStyle(next.present.appearance.bar)
       writeAirOpacity(next.present.appearance.air)
+      writeWeatherPreference(next.present.appearance.weather)
+      writeSkyPreferences(next.present.appearance.sky)
     } catch {
       failed.current = true
       setHasFailure(true)
@@ -64,6 +68,8 @@ export function useSettingsHistory(snapshot: Snapshot, send: Send) {
         writeStageStyle(appearance.stage)
         writeSceneBarStyle(appearance.bar)
         writeAirOpacity(appearance.air)
+        writeWeatherPreference(appearance.weather)
+        writeSkyPreferences(appearance.sky)
         while (fingerprint(settingsOf(current.current.present)) !== fingerprint(saved.current)) {
           const draft = current.current.present
           const settings = { ...settingsOf(draft), Revision: saved.current.Revision }

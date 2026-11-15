@@ -9,7 +9,11 @@ import { GlassStatus } from '@/components/scene-panel'
 import { Plus, Trash2, RefreshCw, RotateCcw, Undo2, Redo2, Check, LoaderCircle, CircleAlert, Monitor, Laptop, Sun, Thermometer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import { WeatherSettings } from '@/components/weather-settings'
 import { Select } from '@/components/ui/select'
+import { SkySettingsEditor } from '@/components/sky-settings'
+import { previewSky } from '@/lib/sky-preference'
+import type { StageKey } from '@/components/scene-panel'
 import { SortableList } from '@/components/sortable-list'
 import { DisplayRow, Level } from '@/App'
 import type { Send } from '@/App'
@@ -21,9 +25,16 @@ const tabs = ['displays', 'scenes', 'schedule', 'focus', 'general'] as const
 export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boolean; close: () => void; snapshot: Snapshot; send: Send; ref: Ref<SettingsEditorHandle> }) {
   const { t, sceneName, setLanguage, displayName, message: translateMessage } = useI18n()
   const [page, setPage] = useState<Page>('displays')
+  const [skyOpen, setSkyOpen] = useState(false)
+  const [skyScene, setSkyScene] = useState<StageKey>('night')
+  const editingSky = open && page === 'general' && skyOpen
+  useEffect(() => {
+    previewSky(editingSky ? skyScene : null)
+    return () => previewSky(null)
+  }, [editingSky, skyScene])
   const navigation = useRef<HTMLElement>(null)
   const { draft, change, undo, redo, reload, flush, saving, status, hasFailure, canUndo, canRedo } = useSettingsHistory(snapshot, send)
-  const { stage: stageStyle, bar: barStyle, air: airOpacity } = draft.appearance
+  const { stage: stageStyle, bar: barStyle } = draft.appearance
   const mixedTransition = draft.ScheduleTransitionMinutes == null && new Set(draft.Schedule.map(point => point.TransitionMinutes)).size > 1
   const transitionMinutes = draft.ScheduleTransitionMinutes ?? draft.Schedule[0]?.TransitionMinutes ?? 30
   useImperativeHandle(ref, () => ({ flush: () => flush() }), [flush])
@@ -54,7 +65,8 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
   return <motion.section className="settings-float" aria-label={t('设置')} aria-hidden={!open} inert={!open} initial={false}
     animate={open ? { opacity: 1, clipPath: 'inset(0% 0% 0% 0% round 28px)' } : { opacity: 0, clipPath: 'inset(88% 28% 0% 28% round 28px)' }}
     transition={{ duration: .3, ease: [.22, .75, .2, 1] }} style={{ pointerEvents: open ? 'auto' : 'none' }}>
-    <div className={`settings-content settings-page-${page}`} key={page}>
+    <div className={`settings-content settings-page-${page}${editingSky ? ' settings-editing-sky' : ''}`} key={page}>
+    {editingSky && <SkySettingsEditor scene={skyScene} selectScene={setSkyScene} value={draft.appearance.sky} change={update => change(s => update(s.appearance.sky[skyScene]))} back={() => setSkyOpen(false)} />}
     {page === 'displays' && <>
       <div className="device-brightness">{snapshot.Displays.map(display => <CurrentDisplay key={display.Id} display={display} send={deviceSend} />)}</div>
       <GlassStatus snapshot={snapshot} send={deviceSend} error="" sceneIds={{ morning: null, midday: null, dusk: null, night: null }} embedded />
@@ -86,11 +98,11 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
       <div className="form-row"><label htmlFor="fullscreen">{t('副屏全屏或最大化时保持亮屏')}</label><Switch id="fullscreen" checked={draft.KeepSecondaryAwakeOnFullscreen} onCheckedChange={on => change(s => { s.KeepSecondaryAwakeOnFullscreen = on })} /></div>
       </div>
     </>}
-    {page === 'general' && <>
+    {page === 'general' && !editingSky && <>
       <div className="settings-function-group">
       <div className="form-row"><label htmlFor="stage-style">{t('主界面样式')}</label><Select id="stage-style" value={stageStyle} onValueChange={value => change(s => { s.appearance.stage = value === 'classic' ? 'classic' : 'live' })} options={[{ value: 'live', label: t('新版实时换光') }, { value: 'classic', label: t('当前版整页换肤') }]} /></div>
       <div className="form-row"><label htmlFor="scene-bar-style">{t('场景栏样式')}</label><Select id="scene-bar-style" value={barStyle} onValueChange={value => change(s => { s.appearance.bar = value === 'icon' ? 'icon' : value === 'both' ? 'both' : 'text' })} options={[{ value: 'text', label: t('仅文字') }, { value: 'icon', label: t('仅图标') }, { value: 'both', label: t('文字与图标') }]} /></div>
-      <div className="form-row"><label htmlFor="air-opacity">{t('空气透明度')}</label><div className="air-opacity-control"><input id="air-opacity" type="range" min={0} max={100} step={1} value={airOpacity} aria-valuetext={`${airOpacity}%`} onChange={e => change(s => { s.appearance.air = e.target.valueAsNumber })} /><output htmlFor="air-opacity">{airOpacity}%</output></div></div>
+      <div className="form-row"><span>{t('天空效果')}</span><Button variant="outline" onClick={() => setSkyOpen(true)}>{t('星星与云彩')}</Button></div>
       <div className="form-row"><label htmlFor="language">{t('语言')}</label><Select id="language" value={draft.Language ?? 'system'} onValueChange={value => { const language = value as Language; change(s => { s.Language = language }); setLanguage(language) }} options={[{ value: 'system', label: t('跟随系统') }, { value: 'zh-CN', label: '简体中文' }, { value: 'en', label: 'English' }]} /></div>
       </div>
       <div className="settings-function-group">
@@ -98,6 +110,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
       <div className="form-row"><label htmlFor="edge-brightness">{t('顶部滚轮调节亮度')}</label><Switch id="edge-brightness" checked={draft.TopEdgeBrightnessEnabled ?? false} onCheckedChange={on => change(s => { s.TopEdgeBrightnessEnabled = on })} /></div>
       <div className="form-row"><label htmlFor="edge-volume">{t('底部滚轮调节音量')}</label><Switch id="edge-volume" checked={draft.BottomEdgeVolumeEnabled ?? false} onCheckedChange={on => change(s => { s.BottomEdgeVolumeEnabled = on })} /></div>
       <div className="form-row"><label htmlFor="edge-modifier">{t('色温／应用音量按键')}</label><Select id="edge-modifier" value={draft.EdgeWheelModifier ?? 'alt'} onValueChange={value => change(s => { s.EdgeWheelModifier = value as EdgeWheelModifier })} options={[{ value: 'alt', label: 'Alt' }, { value: 'ctrl', label: 'Ctrl' }, { value: 'shift', label: 'Shift' }]} /></div>
+      <WeatherSettings value={draft.appearance.weather} live={stageStyle === 'live'} onChange={weather => change(s => { s.appearance.weather = weather; if (weather.enabled) s.appearance.stage = 'live' })} />
       </div>
     </>}
     </div>

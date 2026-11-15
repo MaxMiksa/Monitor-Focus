@@ -65,12 +65,13 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 ## 前端与界面
 
-- 场景权重由 `scripts/export-scene-region-mask.py` 从对齐的中午原图按实际轮廓离线生成：天空 204、草地 166、机器 141；输出开发母版 `frontend/public/scene-morph-mask-v7.png` 和无损运行图 `frontend/public/scenes/live/mask.webp`。天空不再保留飞絮／星点白斑、横向灰带或扩大保护。空气／星点直接复用该天空轮廓，无近似地平线、中心椭圆或亮度保护；边界仅由纹理线性采样覆盖相邻像素，不额外模糊或膨胀。生成不进入运行时、不新增纹理或循环。
+- 场景权重由 `scripts/export-scene-region-mask.py` 从对齐的中午原图按实际轮廓离线生成：天空 204、草地 166、机器 141；输出开发母版 `frontend/public/scene-morph-mask-v7.png` 和无损运行图 `frontend/public/scenes/live/mask.webp`。天空不再保留飞絮／星点白斑、横向灰带或扩大保护。天空组件用 `scripts/export-sky-mask.py` 从该权重图派生 9 KiB 的 RGBA 天空遮罩 `sky-mask.png`，CSS cover 与底图对齐，云彩／星星不覆盖草地和机器。遮罩按真实轮廓裁切，无近似地平线或扩大保护。
 
 - `frontend/src/index.css` 是唯一视觉参数入口；全局字号为正文／按钮 16px、小标题 18px、页面标题 26px，胶囊文字行高 1.25，固定面板不随字号或视口改变尺寸；组件复用 shadcn 风格控件、Lucide 图标和 Motion 短反馈。重大界面改动先生成效果图并取得确认，再用与当前源码一致的真实截图核对。
 - 快捷面板与设置页共用 1168 × 657 DIP（较上一版宽高再增约 10%；最小宽 1024 DIP） 的 16:9 客户区；`window_ratio_windows.go` 用 `WM_SIZING` 和窗口尺寸事件锁定比例，`main.go` 在首次显示及系统贴靠／最大化后恢复并居中。`resizePanel` 仅保留兼容动作，不再切换窗口尺寸。
 - `frontend/public/scenes/` 保存当前版早 / 中 / 傍晚 / 夜四张无文字、无组件的整页 16:9 原创 WebP；`frontend/public/scenes/live/` 保存新版同机位四张 WebP 和一张灰度权重 WebP。仅供开发使用的四张高清 PNG、v7 权重图和 `scene-motion-prototype.html` 留在 `frontend/public/`，Vite 构建结束阶段由 `excludeDevelopmentAssets` 插件从 `frontend/dist` 删除，不进入 exe。正式构建只嵌入场景资源；运行时不请求远程图片或视频，不引入视频解码依赖。真实控件由 React 绘制，避免图片中的按钮与可操作热区错位。
-- 新版舞台的 `LiveSceneStage` 默认启用，「设置 → 通用 → 主界面样式」可切回当前版；偏好存于 `localStorage` 并由 `storage` 事件同步，不进入 Go `Settings`、不改 Revision 或配置迁移。常态仅一张全尺寸画面、一张权重图、一张 128×128 单通道噪声纹理和一张 640×320 飞絮天空补片图集；切换时临时多一张目标画面，完成后直接交换并释放旧纹理，不再重复上传。隐藏、减少动态效果时停止循环；WebGL 初始化失败释放上下文并按当前场景显示原始静态图。
+- 新版舞台的 `LiveSceneStage` 默认启用，「设置 → 通用 → 主界面样式」可切回当前版；偏好存于 `localStorage` 并由 `storage` 事件同步，不进入 Go `Settings`、不改 Revision 或配置迁移。底图常态仅一张全尺寸画面、一张权重图和一张 640×320 飞絮天空补片图集；切换时临时多一张目标画面，完成后直接交换并释放旧纹理，不再重复上传。隐藏、减少动态效果时停止循环；WebGL 初始化失败释放上下文并按当前场景显示原始静态图。
+- `SkyEffects` 复用 `@pmndrs/vanilla` 1.25.0 的 `Clouds`／`Cloud`／`Stars` 与 Three.js 0.187.0，替代手写空气／星点程序。一个透明 WebGL2 画布、最多 72 个实例云片和 18,000 个星点（通过 drawRange 调数量），不逐帧重建几何体；旧噪声纹理已移除。云纹理 `cloud.png` 从上游固定提交本地打包，许可／来源纳入 notices，不请求 CDN。最高 20 fps，隐藏暂停，减少动态效果时只绘静态帧，卸载释放几何／纹理／材质／上下文；长期资源走势未验收。`sky-preference.ts` 校验并保存四场景偏好，纳入现有自动保存／撤销；天空编辑仅发临时画面预览事件，不发送硬件场景请求。当前版背景保留原样，打开天空编辑时临时预览新版舞台。TypeScript 显式映射 three 类型，兼容共享 pnpm store。
 - 飞絮由 `scripts/export-seed-patches.py` 离线制作局部补片，输出 `frontend/public/scenes/live/seed-sky-patches.png` 与 `frontend/src/lib/seed-patches.json`。不改原始 WebP；同一片元程序先补原位置，再从原图减去补片，搬移有符号细节，避免蓝色矩形边缘。10 个偏移量每次绘制计算一次，复用 80 字节数组，不逐像素算轨迹；独立 120 秒无缝时钟，不随场景切换重置。图集 RGB 上传数据 600 KiB，驱动实际内存另测；生成过程只依赖开发机 Python／Pillow／NumPy／OpenCV，产品不依赖它们。
 - 快捷面板的四颗按钮按场景名称显式映射早 / 中 / 傍晚 / 夜，不按目标小时就近取场景；无法识别的名称才按亮度兜底。浏览器示例数据与每日计划同步使用四个场景和四个节点。亮度滑条左端月亮、右端太阳，表示从暗到亮；更多控制只列出未映射到四颗按钮的场景。
 - 前端通过 Wails runtime 发送请求并等待 `monitor-focus-reply`；示例数据只在明确 `?preview=1` 的浏览器预览中出现，硬件请求失败不回退成演示成功。
@@ -79,7 +80,13 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 - `settings-editor.tsx` 是始终挂载的首页玻璃浮层，五个底部分类（当下默认）共享 `lib/settings-history.ts` 的草稿和历史。500 ms 防抖、串行保存、Revision 校验；稳定排序的内容指纹避免 Go/JS 字段顺序引起重复保存。保存期间的新改动继续排队，失败保留草稿；撤销／重做（含本地外观偏好）同样保存。Esc 关闭和首页场景请求先 flush，失败重新展开浮层。状态推送不抢焦点或覆盖未保存内容。
 - 窗口为 frameless，无顶部窗口栏；保留顶部 28px 隐形拖动区。设置浮层由胶囊向上裁切展开，无向下箭头，顶部不留操作行；重新检测与「已自动保存」及变化图标位于底栏左侧，浮层固定 958×526 DIP，左右与上下始终居中，不随主窗口缩放；内部布局不依赖视口断点，五导航与收起胶囊共用垂直中心锚点（距浮层底边约 32px），不以各自底边对齐；首页场景栏及按钮均按内容定宽，取消百分比宽度、最小固定宽度与 flex 等分；外框内边距和按钮间距由 --nav-focus-size 按比例派生，内部 scene-capsule-focus 按内容包裹；它与设置页选中按钮共用玻璃材质，高 38px、文字左右 15px 留白，纯图标 38px 正圆；图标 19px／2.1px 描边及 96% 白色、内外框增强边缘对比，外框上下高光强度一致、选中圈不加单侧高光，阴影垂直偏移为零，避免光影破坏等距观感，无背景模糊；历史组右／下等距 14px。专注／通用以独立分组固定归属，场景两列网格纵向延伸、四项同屏。舞台 overflow: clip 防止焦点自动滚动破坏居中。首页方向键／WASD 切场景与展开；浮层内切分类，↓ / S 收起；Esc 收起后再按通过既有 `window-close` 销毁面板并保留托盘核心。输入控件、组合输入和已处理的按键不被全局导航劫持。
 
+联合版验收：`build/diagnostics/sky-weather-unified-20261115.json` 记录五次开关面板；15 个关闭后采样均为 0 个 WebView2，最后关闭的 Private Bytes／专用工作集约 35.30／18.67 MB。仅证明本次开关释放路径，不证明长期无泄漏或已测显存。部署与唯一自启证据见同前缀 `-update.json`，前端／正式构建日志、样式截图和隔离源码清单见 `build/diagnostics/sky-effects/`。
+
 ## 开发验收原则
+
+天气雨景：`frontend/src/lib/weather.ts` 只在面板实时舞台中请求固定 HTTPS `api.open-meteo.com`／`geocoding-api.open-meteo.com`，生产 CSP 仅增加这两个连接来源；不经过硬件串行队列、不增加 Go 后台轮询。请求 10 秒超时、64 KiB 响应上限、禁凭据／跳转，校验城市坐标、当前天气字段／代码／时间；15 分钟刷新，30 分钟到期停止沿用缓存，隐藏取消请求，卸载取消定时器及请求。`weather-settings.tsx` 负责搜索／选择和临时预览，偏好纳入 `settings-history.ts`。雨丝直接并入 `LiveSceneStage` 原片元程序，复用现有纹理／画布／时钟，雨天最高 24 fps（场景切换仍最多 30 fps），减少动态效果时仅静态绘制。未引入视频、雨景图集或额外依赖；生成效果图仅用于设计确认，不进入发布资源。
+
+雨景验收证据：`build/diagnostics/weather-state-checks.json` 覆盖雨／无雨、错误天气代码、15 分钟刷新、30 分钟缓存过期、隐藏暂停及卸载清理；`weather-rain-memory.json` 是相同正式 exe 在原生 WebView2、mock 硬件隔离下所有自有进程的短时对照。热态关闭／开启雨丝的 Private Bytes 中位数约 418.95／413.59 MB，专用工作集约 185.71／186.08 MB；这说明本次未见超出进程波动的明确雨景增量，不代表雨景能省内存或长期无泄漏，也未测独立显存。该样本不含另外开发中的新天空组件，不能当作联合版的整体占用结论。
 
 优先保证功能，再做与风险相称的最小检查：`scripts/build.ps1 -Check` 覆盖冻结安装、前端 lint／构建、Go test／vet 与正式构建。涉及真实硬件时，先正常退出现用核心并确认颜色与亮度恢复，再独占运行显式验收入口；普通测试和浏览器预览不写真实显示器或音量。
 

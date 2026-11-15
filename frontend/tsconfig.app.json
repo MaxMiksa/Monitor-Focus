@@ -2,7 +2,7 @@
   "compilerOptions": {
     "strict": true,
     "resolveJsonModule": true,
-    "paths": { "@/*": ["./src/*"] },
+    "paths": { "@/*": ["./src/*"], "three": ["./node_modules/@types/three/index.d.ts"] },
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "target": "es2023",
     "lib": ["ES2023", "DOM"],

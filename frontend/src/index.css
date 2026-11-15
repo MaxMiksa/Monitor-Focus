@@ -231,6 +231,28 @@ input[type=number] { width: 104px; }
 .settings-float [data-slot=switch-thumb] { width: 17px; height: 17px; background: #fff9eb; }
 .settings-float [data-slot=switch-thumb][data-state=checked] { transform: translateX(15px); background: #9a8069; }
 .settings-float .settings-page-general { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 0 44px; align-content: center; padding-bottom: 24px; }
+.sky-effects-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; mask-image: url('/scenes/live/sky-mask.png'); mask-size: cover; mask-position: center; mask-repeat: no-repeat; }
+.settings-float .settings-editing-sky { display: block; padding-top: 16px; padding-bottom: 8px; }
+.sky-settings { width: 100%; }
+.sky-settings-top { position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 18px; min-height: 38px; }
+.sky-settings-top > button { position: absolute; left: 0; }
+.sky-scene-selector { display: flex; padding: 3px; border: 1px solid #fff9eb45; border-radius: 999px; background: #fff9eb08; }
+.sky-scene-selector [data-slot=button] { padding: 0 15px; }
+.sky-scene-selector [aria-pressed=true] { background: #fff9eb20; box-shadow: inset 0 0 0 1px #fff9eb99; }
+.sky-settings-columns { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 40px; }
+.sky-effect-card { min-width: 0; padding: 14px 18px; border: 1px solid #fff9eb28; border-radius: 22px; background: #fff9eb05; }
+.sky-effect-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.sky-effect-heading h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--text-base); font-weight: var(--font-weight-medium); }
+.sky-effect-heading h2 svg { width: 18px; height: 18px; }
+.sky-effect-card > [data-slot=select-trigger] { width: 100%; max-width: none; margin-bottom: 10px; }
+.sky-effect-slider { display: grid; grid-template-columns: max-content minmax(0,1fr) 42px; align-items: center; min-height: 38px; gap: 10px; }
+.sky-effect-slider output { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-height: 560px) {
+  .sky-settings-top { margin-bottom: 10px; }
+  .sky-effect-card { padding-top: 10px; padding-bottom: 10px; }
+  .sky-effect-heading { margin-bottom: 8px; }
+  .sky-effect-slider { min-height: 34px; }
+}
 .settings-float .air-opacity-control { width: 150px; gap: 6px; }
 .settings-float .air-opacity-control input { width: 100%; padding: 0; min-height: 24px; border: 0; accent-color: #fff0d2; background: transparent; }
 .settings-float .air-opacity-control output { min-width: 34px; }
@@ -330,6 +352,14 @@ input[type=number] { width: 104px; }
 .settings-function-group .form-row > :not(label) { flex-shrink: 0; }
 .settings-function-group input[type=number] { width: 94px; }
 .settings-function-group .form-row:last-child { border-bottom: 0; }
+.weather-city-row > button { max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.weather-city-search { display: grid; gap: 8px; padding: 4px 0 10px; }
+.weather-search-input { display: flex; gap: 6px; min-width: 0; }
+.weather-search-input input { flex: 1; width: 0; min-width: 0; }
+.weather-city-search > button { width: 100%; }
+.weather-city-search p { margin: 0; }
+.weather-state-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; }
+.weather-source { display: inline-block; color: inherit; font-size: var(--text-sm); padding: 2px 0 8px; text-underline-offset: 3px; }
 .settings-float .settings-page-scenes { padding-bottom: 6px; }
 .settings-page-scenes .scene-heading { margin-bottom: 3px; grid-template-columns: 20px minmax(0,1fr) 24px; }
 .settings-page-scenes .scene-heading input { min-height: 28px; height: 28px; padding-block: 3px; }
