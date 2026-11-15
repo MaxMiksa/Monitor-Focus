@@ -1,5 +1,9 @@
+import { createActualUI } from './actual-ui.js'
+import { rainMoodOpacity } from '../../frontend/src/lib/rain-appearance.ts'
+
 const $ = selector => document.querySelector(selector)
 const host = $('#effect')
+const actualUI = createActualUI($('#stage'))
 const presets = [
   { id: 'fine', name: '轻细雨', engine: 'tsParticles', detail: '细短、清透、轻盈。雨丝克制，草坡最清晰。', kind: 'ts', url: 'https://github.com/tsparticles/tsparticles' },
   { id: 'soft', name: '柔和雨幕', engine: 'tsParticles', detail: '柔边雨丝，疏密有致。比轻细雨更有存在感。', kind: 'ts', url: 'https://github.com/tsparticles/tsparticles' },
@@ -12,6 +16,14 @@ let selected = 4, amount = .75, paused = false, baseline = false
 let active = null, revision = 0, saved = null
 let splashEnabled = true
 let moodEnabled = true, currentScene = 'midday'
+let uiEnabled = true
+actualUI.onChange(() => active?.refreshEdges?.())
+actualUI.onScene(scene => {
+  if (!['morning', 'midday', 'dusk', 'night'].includes(scene)) return
+  currentScene = scene
+  $('#backdrop').style.backgroundImage = `url('/scenes/live/${scene}.webp')`
+  present()
+})
 const frameBudget = 30
 try {
   const remembered = JSON.parse(localStorage.getItem('monitors-focus.rain-gallery-choice') || 'null')
@@ -52,6 +64,9 @@ function present() {
   $('#splash').setAttribute('aria-pressed', String(splashEnabled))
   $('#mood').hidden = presets[selected].id !== 'wind'
   $('#mood').setAttribute('aria-pressed', String(moodEnabled))
+  $('#ui-mode').hidden = presets[selected].id !== 'wind'
+  $('#ui-mode').setAttribute('aria-pressed', String(uiEnabled))
+  actualUI.setEnabled(uiEnabled && presets[selected].id === 'wind')
   const rainyMood = presets[selected].id === 'wind' && moodEnabled && !baseline && amount > 0
   document.body.classList.toggle('rainy-mood', rainyMood)
   document.body.dataset.scene = currentScene
@@ -62,11 +77,12 @@ function present() {
   $('#pause').setAttribute('aria-pressed', String(paused))
   $('#pause').textContent = paused ? '继续' : '暂停'
   $('#atmosphere').style.opacity = baseline || presets[selected].kind === 'local' || (presets[selected].id === 'wind' && !rainyMood)
-    ? '0' : String(rainyMood ? (currentScene === 'night' ? .4 + amount * .25 : .8 + amount * .15) : .25 + amount * .55)
+    ? '0' : String(rainyMood ? rainMoodOpacity(amount, currentScene === 'night') : .25 + amount * .55)
   host.style.visibility = baseline ? 'hidden' : 'visible'
   $('#chosen').textContent = saved ? `已记住：${saved.name} · 雨量 ${saved.intensity}` : ''
 }
 function synchronize() {
+  active?.setEdges?.(actualUI.getEdges)
   active?.setSplashes?.(splashEnabled)
   active?.setAmount(baseline ? 0 : amount)
   active?.setPaused(paused || baseline || document.hidden || amount === 0)
@@ -297,6 +313,7 @@ $('#baseline').addEventListener('click', () => { baseline = !baseline; synchroni
 $('#pause').addEventListener('click', () => { paused = !paused; synchronize() })
 $('#splash').addEventListener('click', () => { splashEnabled = !splashEnabled; synchronize() })
 $('#mood').addEventListener('click', () => { moodEnabled = !moodEnabled; present() })
+$('#ui-mode').addEventListener('click', () => { uiEnabled = !uiEnabled; present() })
 $('#choose').addEventListener('click', () => {
   saved = { id: presets[selected].id, name: presets[selected].name, intensity: Math.round(amount * 100) }
   // Preview choice is isolated from application weather/settings state.
@@ -308,6 +325,6 @@ $('#clean').addEventListener('click', () => clean(true))
 $('#restore').addEventListener('click', () => clean(false))
 document.addEventListener('keydown', event => { if (event.key === 'Escape') clean(false) })
 document.addEventListener('visibilitychange', synchronize)
-window.addEventListener('pagehide', () => { ++revision; active?.dispose(); active = null })
+window.addEventListener('pagehide', () => { ++revision; active?.dispose(); active = null; actualUI.dispose() })
 present()
 void switchEffect()

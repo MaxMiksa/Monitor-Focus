@@ -9,6 +9,7 @@ import { useSceneBarStyle, useStageStyle } from '@/lib/stage-preference'
 import { LiveSceneStage } from '@/components/live-scene-stage'
 import { useWeatherRain } from '@/lib/weather'
 import { SkyEffects } from '@/components/sky-effects'
+import { RainAtmosphere, WeatherRainOverlay } from '@/components/weather-rain'
 import { SettingsMorphSurface } from '@/components/settings-morph'
 import { useSettingsMorph } from '@/components/settings-morph-context'
 import { SKY_PREVIEW_EVENT, skyScenes } from '@/lib/sky-preference'
@@ -229,9 +230,9 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
   const displays = snapshot.Displays.slice(0, 2)
   const visibleStage = settingsOpen && skyPreview ? skyPreview : stage
   const caption = stageNames[visibleStage]
-  return <div className="scene-shell" data-scene={visibleStage} data-stage={live ? 'live' : 'classic'} data-settings-open={settingsOpen}>
+  return <div className="scene-shell" data-scene={visibleStage} data-stage={live ? 'live' : 'classic'} data-settings-open={settingsOpen} data-raining={rain > 0}>
     <div className="scene-backdrop" aria-hidden="true">
-      {live ? <><LiveSceneStage key="live" scene={visibleStage} reduced={!!reduced} rain={rain} /><SkyEffects scene={visibleStage} reduced={!!reduced} /></> : (Object.keys(sceneAssets) as StageKey[]).map(key => <div key={key} className="scene-image" data-active={stage === key} style={{ backgroundImage: `url('${sceneAssets[key]}')` }} />)}
+      {live ? <><LiveSceneStage key="live" scene={visibleStage} reduced={!!reduced} /><SkyEffects scene={visibleStage} reduced={!!reduced} /><RainAtmosphere rain={rain} scene={visibleStage} /></> : (Object.keys(sceneAssets) as StageKey[]).map(key => <div key={key} className="scene-image" data-active={stage === key} style={{ backgroundImage: `url('${sceneAssets[key]}')` }} />)}
     </div>
     <div className="window-drag-region" data-app-region="drag" aria-hidden="true" />
     <div className="scene-wash" aria-hidden="true" />
@@ -285,6 +286,7 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
     <AnimatePresence>{more && fullBarOpen && <motion.div className={`glass-more${live ? ' glass-more-live' : ''}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: .18 }}><GlassStatus snapshot={snapshot} error={error} send={send} sceneIds={ids} close={() => setMore(false)} /></motion.div>}</AnimatePresence>
     {children}
     <SettingsMorphSurface anchorKey={`${live}-${barStyle}`} />
+    {live && <WeatherRainOverlay rain={rain} reduced={!!reduced} settingsOpen={settingsOpen} />}
     {missing && <p className="scene-missing" role="status">{missing}</p>}
     {demo && <p className="scene-demo" role="status">{t('此浏览器预览只展示界面，不控制硬件。')}</p>}
     {!(more && fullBarOpen) && (snapshot.Warning || snapshot.Error || error || snapshot.Displays.some(d => d.Error)) && <p className="scene-alert" role="alert"><AlertCircle />{[snapshot.Warning, snapshot.Error, error, ...snapshot.Displays.filter(d => d.Error).map(d => d.Error)].filter(Boolean).join(' · ')}</p>}

@@ -2,7 +2,7 @@
   "name": "monitors-focus-rain-preview",
   "private": true,
   "type": "module",
-  "scripts": { "start": "vite --host 127.0.0.1 --port 5194 --strictPort" },
+  "scripts": { "build:ui": "vite build --config ui.config.js", "start": "vite --host 127.0.0.1 --port 5194 --strictPort" },
   "dependencies": {
     "@tsparticles/engine": "4.5.3",
     "@tsparticles/slim": "4.5.3",

@@ -23,7 +23,8 @@
     "react-dom": "^19.3.1",
     "tailwind-merge": "^3.7.0",
     "tailwindcss": "^4.3.3",
-    "three": "^0.187.0"
+    "three": "^0.187.0",
+    "three.quarks": "0.17.1"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

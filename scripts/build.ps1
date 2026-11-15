@@ -1,4 +1,4 @@
-param([string]$Go='D:\Apps\go\bin\go.exe',[string]$Pnpm='D:\Apps\pnpm\12.16.1\pnpm.exe',[switch]$Check,[switch]$Package)
+param([string]$Go='D:\Apps\go\bin\go.exe',[string]$Pnpm='D:\Apps\pnpm\12.16.1\pnpm.exe',[switch]$Check,[switch]$Package,[string]$SourceOverlay)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 Push-Location $root
@@ -9,6 +9,20 @@ try {
     if ($LASTEXITCODE -or $version.Trim() -ne '12.16.1') { throw 'pnpm 12.16.1 required' }
     $goVersion=& $Go version
     $overlay=& "$PSScriptRoot/New-GoMemoryOverlay.ps1" -Go $Go
+    if ($SourceOverlay) {
+        # Isolate other ongoing Go edits without changing their working files.
+        $merged = Get-Content -LiteralPath $overlay -Raw | ConvertFrom-Json -AsHashtable
+        $sources = Get-Content -LiteralPath $SourceOverlay -Raw | ConvertFrom-Json -AsHashtable
+        foreach ($sourcePath in $sources.Replace.Keys) {
+            $absolute = [IO.Path]::GetFullPath($sourcePath)
+            if (-not $absolute.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or -not $absolute.EndsWith('.go', [StringComparison]::OrdinalIgnoreCase)) { throw 'Source overlays must identify Go files within this project.' }
+            $replacement = $sources.Replace[$sourcePath]
+            if ($replacement -and -not (Test-Path -LiteralPath $replacement -PathType Leaf)) { throw 'Source overlay replacement is missing.' }
+            $merged.Replace[$absolute] = $replacement
+        }
+        $overlay = Join-Path $root 'build/go-memory-overlay/production-overlay.json'
+        [IO.File]::WriteAllText($overlay, ($merged | ConvertTo-Json -Depth 4), [Text.UTF8Encoding]::new($false))
+    }
     & $Pnpm --dir frontend install --frozen-lockfile
     if ($LASTEXITCODE) { throw 'Frontend restore failed' }
     $web=[Diagnostics.Stopwatch]::StartNew()

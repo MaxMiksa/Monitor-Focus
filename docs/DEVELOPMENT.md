@@ -63,6 +63,8 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 正式构建必须使用 `scripts/build.ps1` 应用 overlay，并在构建后校验 PE `.data` 可写段小于 8 MiB；直接 `go build` 不会获得该处理。Go 版本、标准库源结构或上游修复发生变化时，`New-GoMemoryOverlay.ps1` 会因精确匹配失败而停止构建；此时先复核是否应移除 overlay，再升级工具链，不能静默跳过。发布前用唯一标签实测内存，不能把历史数字当作新版结论。
 
+并行原生改动隔离：`scripts/build.ps1 -SourceOverlay <json>` 接受 Go overlay 的 `Replace` 映射，合并到内存 overlay；源键必须是仓库内 `.go` 文件，替换文件必须存在，空值表示排除。不修改其他任务工作文件。本次雨景以 `build/rain-native-source/source-overlay.json` 使用已提交 display/recovery 基线并排除未完成测试；替换内容用 `.go.overlay` 后缀，避免 `go test ./...` 把构建目录识别为额外包。
+
 ## 前端与界面
 
 - 场景权重由 `scripts/export-scene-region-mask.py` 从对齐的中午原图按实际轮廓离线生成：天空 204、草地 166、机器 141；输出开发母版 `frontend/public/scene-morph-mask-v7.png` 和无损运行图 `frontend/public/scenes/live/mask.webp`。天空不再保留飞絮／星点白斑、横向灰带或扩大保护。天空组件用 `scripts/export-sky-mask.py` 从该权重图派生 9 KiB 的 RGBA 天空遮罩 `sky-mask.png`，CSS cover 与底图对齐，云彩／星星不覆盖草地和机器。遮罩按真实轮廓裁切，无近似地平线或扩大保护。
@@ -87,13 +89,15 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 ## 开发验收原则
 
-雨效选型预览位于 `scripts/rain-preview/`，`npm ci --ignore-scripts` 后 `npm start`，仅在 `127.0.0.1:5194` 提供浏览器页面；不进入正式前端或 exe，不接硬件／天气。锁定 tsParticles 4.5.3 与 three.quarks 0.17.1，六种配置共用同一场景、0–100 雨量、30 fps 上限、原景对照／暂停／纯净观景；只运行当前候选，切换销毁画布与计时器，隐藏暂停。选择仅写预览独立偏好，用户已选择斜风雨，最终接入与原生内存对比待新增溅落预览确认后开展。已验证组件切换只有一个画布且无控制台错误。第六款 local-cloud.js 使用透明乌云（运行时缩至 512px）、源图坐标定位的局部画布与三个复用 quarks 系统，雨滴碰撞机顶后停止并发射水珠／水冠；粒子上限分别为 320／128／32，DPR 1、30 fps，不创建逐次碰撞系统。雨量采用 180s + 540s³（s 为 0–1），最大 720 滴／秒，为初版四倍；水花上限不变。云图已清理黑色边缘，位图禁预乘 alpha，材质沿轮廓取邻近 alpha 渐隐，不增加纹理。零雨量清空隐藏乌云，暂停停止推进，四背景与纯净观景沿用同一机顶坐标；已验证零雨量、暂停／恢复、原景对照、四背景及切换，截图位于 build/diagnostics/rain-gallery/cloud-preview.jpg。这不等于已测正式版总内存。
+雨景运行时：`frontend/src/lib/wind-rain-runtime.js` 是正式版与浏览器预览共用的唯一斜风雨实现；锁定 three.quarks 0.17.1（MIT）并复用现有 Three.js。`WeatherRainOverlay` 只在可见、非减少动态效果且雨量大于零时懒加载并创建一个透明画布；停雨、隐藏及卸载释放粒子系统、批次、材质、纹理、计时器、观察器与 WebGL 上下文。模块代码可被浏览器缓存，停止下雨不等于卸载模块。DPR 1、30 fps，三张微型纹理；三层最大总速率 1380 滴／秒，雨丝／水珠／短弧上限 2400／144／24。复用水珠与短弧系统，不为每次溅落新建系统。
 
-选定斜风雨预览：`scripts/rain-preview/wind-rain.js` 沿用 three.quarks 三层风雨，高端增加远层密度，最大 1380 滴／秒（初版四倍）。雨滴经过源图机顶 y=378、x=722–945 时触发短促顺风小水珠与少量短弧，不截断或修改雨滴轨迹／寿命；草坡不生成水花。雨丝／水珠／短弧上限 2400／144／24，一个画布、三张小纹理、DPR 1、30 fps，复用水珠系统与发射描述；溅落开关、归零清空、暂停与切换已验收，未测原生总内存。截图见 `build/diagnostics/rain-gallery/wind-preview.jpg`。
+雨丝连续经过机顶源图 y=378、x=722–945 时产生短促水珠与少量短弧，不改变雨滴轨迹／寿命。真实 `.settings-morph-surface` 与收起提示的上缘按每帧矩形定位，跟随连续形变；雨层位于控件之上且点击穿透。设置展开同步清除并关闭机顶水花，收起恢复；外框溅落保留。氛围由背景内静态渐变实现，不加模糊／纹理／计时器；`rain-appearance.ts` 共用雨量曲线，小雨透明度趋零、最大雨量保持，夜景减轻压暗。
 
-天气雨景：`frontend/src/lib/weather.ts` 只在面板实时舞台中请求固定 HTTPS `api.open-meteo.com`／`geocoding-api.open-meteo.com`，生产 CSP 仅增加这两个连接来源；不经过硬件串行队列、不增加 Go 后台轮询。请求 10 秒超时、64 KiB 响应上限、禁凭据／跳转，校验城市坐标、当前天气字段／代码／时间；15 分钟刷新，30 分钟到期停止沿用缓存，隐藏取消请求，卸载取消定时器及请求。`weather-settings.tsx` 负责搜索／选择和临时预览，偏好纳入 `settings-history.ts`。雨丝直接并入 `LiveSceneStage` 原片元程序，复用现有纹理／画布／时钟，雨天最高 24 fps（场景切换仍最多 30 fps），减少动态效果时仅静态绘制。未引入视频、雨景图集或额外依赖；生成效果图仅用于设计确认，不进入发布资源。
+天气请求：`weather.ts` 仅请求固定 HTTPS `api.open-meteo.com`／`geocoding-api.open-meteo.com`，生产 CSP 仅允许这些天气来源；不经过硬件队列、不增加 Go 后台轮询。请求 10 秒超时、64 KiB 响应上限、禁凭据／跳转，并校验城市坐标、天气字段／代码／时间；15 分钟刷新，30 分钟缓存到期停雨，隐藏取消请求，卸载取消定时器。`weather-settings.tsx` 负责搜索／选择与 30 秒预览，偏好纳入撤销历史；降雨量沿用现有天气强度映射，不改变硬件目标。
 
-雨景验收证据：`build/diagnostics/weather-state-checks.json` 覆盖雨／无雨、错误天气代码、15 分钟刷新、30 分钟缓存过期、隐藏暂停及卸载清理；`weather-rain-memory.json` 是相同正式 exe 在原生 WebView2、mock 硬件隔离下所有自有进程的短时对照。热态关闭／开启雨丝的 Private Bytes 中位数约 418.95／413.59 MB，专用工作集约 185.71／186.08 MB；这说明本次未见超出进程波动的明确雨景增量，不代表雨景能省内存或长期无泄漏，也未测独立显存。该样本不含另外开发中的新天空组件，不能当作联合版的整体占用结论。
+浏览器选型：`scripts/rain-preview/` 中运行 `npm ci --ignore-scripts`、`npm run build:ui`、`npm start`，访问 `http://127.0.0.1:5194`。六款配置仅用于比较；斜风雨 re-export 正式运行时。默认「实际界面」通过只读模拟桥复用实际设置／胶囊组件，不调用硬件；预览生成到 `build/rain-ui-preview`，不进入正式 exe。`/product/?preview=1` 使用 `frontend/dist` 检查真实正式资源；生产环境不提供此开发服务。零雨量、暂停、开关、视口变化与切换销毁已验证。
+
+雨景验收：正式资源浏览器检查通过设置展开机顶水花归零、收起恢复、边框持续溅落、点击穿透与 30 秒预览到期画布释放，无控制台错误。构建／lint、Go test／vet 与 PE 检查见 `build/diagnostics/rain-production-build.log`。部署证据见 `rain-wind-final-20261116-update.json`（最终包仅补齐依赖许可，构建日志 `rain-production-final-build.log`）；五轮面板开关后 15 个关闭采样均无 WebView2，最后关闭私有提交量约 37.38 MB、专用工作集约 19.62 MB，见 `rain-wind-20261116.json`。此检查使用当前用户天气偏好，仅证明面板释放路径；新粒子雨景的原生雨开／关增量、长期内存及显存尚未测定，旧 shader 雨景短测不能用于新版结论。
 
 优先保证功能，再做与风险相称的最小检查：`scripts/build.ps1 -Check` 覆盖冻结安装、前端 lint／构建、Go test／vet 与正式构建。涉及真实硬件时，先正常退出现用核心并确认颜色与亮度恢复，再独占运行显式验收入口；普通测试和浏览器预览不写真实显示器或音量。
 
