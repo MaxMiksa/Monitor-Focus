@@ -60,7 +60,7 @@ export async function createLocalCloud(slot, report) {
   cloudTexture.magFilter = T.LinearFilter
   cloudTexture.needsUpdate = true
   const cloudGeometry = new T.PlaneGeometry(CLOUD.width, CLOUD.width * bitmap.height / bitmap.width)
-  const cloudMaterial = new T.MeshBasicMaterial({ map: cloudTexture, transparent: true, depthWrite: false, depthTest: false })
+  const cloudMaterial = new T.MeshBasicMaterial({ map: cloudTexture, transparent: true, opacity: .8, depthWrite: false, depthTest: false })
   // Trim the remaining matte fringe and feather alpha without another texture.
   cloudMaterial.onBeforeCompile = shader => {
     shader.uniforms.cloudTexel = { value: new T.Vector2(1 / bitmap.width, 1 / bitmap.height) }
