@@ -15,8 +15,9 @@
 .rainy-mood #atmosphere{
   mix-blend-mode:normal;
   background:
-    radial-gradient(ellipse at 22% -15%,#15212e80 0%,transparent 65%),
-    linear-gradient(180deg,#273a4dd9 0%,#5269778c 36%,#7d919c45 60%,#b0c2c72b 70%,#53697418 84%,#192c392e 100%);
+    radial-gradient(ellipse at 20% -10%,#1523318c 0%,transparent 66%),
+    radial-gradient(ellipse at 70% 67%,#bac6cd24 0%,transparent 40%),
+    linear-gradient(180deg,#334553e6 0%,#4a5e6bb8 32%,#73879273 54%,#a2b5be66 68%,#48606b52 84%,#233b465c 100%);
 }
 .rainy-mood[data-scene=night] #atmosphere{
   background:linear-gradient(180deg,#17263670,#5265752e 48%,#92aab92b 70%,transparent 95%);

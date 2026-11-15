@@ -62,7 +62,7 @@ function present() {
   $('#pause').setAttribute('aria-pressed', String(paused))
   $('#pause').textContent = paused ? '继续' : '暂停'
   $('#atmosphere').style.opacity = baseline || presets[selected].kind === 'local' || (presets[selected].id === 'wind' && !rainyMood)
-    ? '0' : String(rainyMood ? (currentScene === 'night' ? .4 : .7) + amount * .25 : .25 + amount * .55)
+    ? '0' : String(rainyMood ? (currentScene === 'night' ? .4 + amount * .25 : .8 + amount * .15) : .25 + amount * .55)
   host.style.visibility = baseline ? 'hidden' : 'visible'
   $('#chosen').textContent = saved ? `已记住：${saved.name} · 雨量 ${saved.intensity}` : ''
 }
