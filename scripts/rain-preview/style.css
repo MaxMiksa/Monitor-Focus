@@ -4,3 +4,9 @@
 .controls{padding:20px 30px 18px}.toolbar{margin-bottom:15px}.choice{min-height:90px}.bottom-row{margin-top:17px}
 @media(max-width:560px){#stage{height:48vh}.controls{padding:18px}}
 
+.choices{grid-template-columns:repeat(6,1fr)}
+.local-cloud #backdrop{background-size:contain;background-repeat:no-repeat}
+.local-cloud #stage{background:#162520}
+#effect canvas.local-rain-canvas{inset:auto!important;width:var(--rain-width)!important;height:var(--rain-height)!important;left:var(--rain-left)!important;top:var(--rain-top)!important}
+@media(max-width:800px){.choices{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:560px){.choices{grid-template-columns:repeat(2,1fr)}}

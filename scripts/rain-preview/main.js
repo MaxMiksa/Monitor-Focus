@@ -6,8 +6,9 @@ const presets = [
   { id: 'natural', name: '立体自然雨', engine: 'three.quarks', detail: '远近三层，细雨有空间。近处稍快，远处更轻。', kind: 'quarks', url: 'https://github.com/Alchemist0823/three.quarks' },
   { id: 'cinema', name: '电影感雨丝', engine: 'three.quarks', detail: '稀疏长雨丝，柔光拖尾。更安静，也更有氛围。', kind: 'quarks', url: 'https://github.com/Alchemist0823/three.quarks' },
   { id: 'wind', name: '斜风雨', engine: 'three.quarks', detail: '更明显的斜向落雨，随风有轻微变化。适合大雨。', kind: 'quarks', url: 'https://github.com/Alchemist0823/three.quarks' },
+  { id: 'cloud', name: '小乌云淋雨', engine: 'three.quarks', detail: '一朵乌云轻飘，局部落雨，击中机顶溅起小水花。', kind: 'local', url: 'https://github.com/Alchemist0823/three.quarks' },
 ]
-let selected = 2, amount = .45, paused = false, baseline = false
+let selected = 5, amount = .65, paused = false, baseline = false
 let active = null, revision = 0, saved = null
 const frameBudget = 30
 try {
@@ -19,12 +20,17 @@ try {
     $('#intensity').value = String(remembered.intensity)
   }
 } catch { /* A stale preview preference must not block viewing. */ }
-function report(count, fps) {
+function report(count, fps, splashes) {
   const state = baseline ? '原景对照' : paused ? '已暂停' : amount === 0 ? '无雨' : document.hidden ? '已暂停' : fps ? `${fps} 帧` : `上限 ${frameBudget} 帧`
-  $('#render-status').textContent = `${presets[selected].engine} · ${count} 雨丝 · ${state}`
+  $('#render-status').textContent = splashes === undefined
+    ? `${presets[selected].engine} · ${count} 雨丝 · ${state}`
+    : `${count} 雨滴 · ${splashes} 水花 · ${state}`
   host.dataset.particles = String(count)
   host.dataset.paused = String(paused || baseline || document.hidden || amount === 0)
 }
+// Each new review opens on the newly approved local-cloud candidate.
+if (!saved || saved.id !== 'cloud') { selected = 5; amount = .65 }
+$('#intensity').value = String(Math.round(amount * 100))
 const chooseButtons = presets.map((preset, index) => {
   const button = document.createElement('button')
   button.className = 'choice'
@@ -40,12 +46,13 @@ function present() {
   $('#current-title').textContent = `0${selected + 1} · ${presets[selected].name}`
   $('#description').textContent = presets[selected].detail
   $('#source').href = presets[selected].url
+  document.body.classList.toggle('local-cloud', presets[selected].kind === 'local')
   const value = Math.round(amount * 100)
   $('#intensity-value').textContent = `${value} · ${value === 0 ? '无雨' : value < 30 ? '小雨' : value < 70 ? '中雨' : '大雨'}`
   $('#baseline').setAttribute('aria-pressed', String(baseline))
   $('#pause').setAttribute('aria-pressed', String(paused))
   $('#pause').textContent = paused ? '继续' : '暂停'
-  $('#atmosphere').style.opacity = baseline ? '0' : String(.25 + amount * .55)
+  $('#atmosphere').style.opacity = baseline || presets[selected].kind === 'local' ? '0' : String(.25 + amount * .55)
   host.style.visibility = baseline ? 'hidden' : 'visible'
   $('#chosen').textContent = saved ? `已记住：${saved.name} · 雨量 ${saved.intensity}` : ''
 }
@@ -68,7 +75,9 @@ async function switchEffect() {
   host.append(slot)
   try {
     const preset = presets[selected]
-    const runtime = preset.kind === 'ts' ? await createParticles(slot, preset) : await createQuarks(slot, preset)
+    const runtime = preset.kind === 'local'
+      ? await (await import('./local-cloud.js')).createLocalCloud(slot, report)
+      : preset.kind === 'ts' ? await createParticles(slot, preset) : await createQuarks(slot, preset)
     if (token !== revision) { runtime.dispose(); slot.remove(); return }
     active = runtime
     document.body.dataset.effect = preset.id
