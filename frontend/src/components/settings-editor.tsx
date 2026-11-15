@@ -6,6 +6,7 @@ import { motion } from 'motion/react'
 import { pageLabels } from '@/lib/i18n'
 import { useSettingsHistory } from '@/lib/settings-history'
 import { GlassStatus } from '@/components/scene-panel'
+import { useSettingsMorph } from '@/components/settings-morph-context'
 import { Plus, Trash2, RefreshCw, RotateCcw, Undo2, Redo2, Check, LoaderCircle, CircleAlert, Monitor, Laptop, Sun, Thermometer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -23,6 +24,7 @@ import type { Display, EdgeWheelModifier, Settings, Snapshot } from '@/lib/contr
 export type SettingsEditorHandle = { flush: () => Promise<boolean> }
 const tabs = ['displays', 'scenes', 'schedule', 'focus', 'general'] as const
 export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boolean; close: () => void; snapshot: Snapshot; send: Send; ref: Ref<SettingsEditorHandle> }) {
+  const { settingsOpacity, clipPath } = useSettingsMorph()
   const { t, sceneName, setLanguage, displayName, message: translateMessage } = useI18n()
   const [page, setPage] = useState<Page>('displays')
   const [skyOpen, setSkyOpen] = useState(false)
@@ -62,12 +64,8 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
     return () => window.removeEventListener('keydown', onKey)
   }, [open, page, close])
   const deviceSend: Send = async command => await flush() ? send(command) : null
-  return <motion.section className="settings-float" aria-label={t('设置')} aria-hidden={!open} inert={!open} initial={false}
-    animate={open ? { opacity: 1, clipPath: 'inset(0% 0% 0% 0% round 28px)' } : { opacity: 0, clipPath: 'inset(88% 28% 0% 28% round 28px)' }}
-    transition={{
-      clipPath: { duration: .3, ease: open ? [.22, .75, .2, 1] : [.4, 0, .78, .25] },
-      opacity: open ? { duration: .3, ease: [.22, .75, .2, 1] } : { delay: .24, duration: .06, ease: 'linear' },
-    }} style={{ pointerEvents: open ? 'auto' : 'none' }}>
+  return <motion.section className="settings-float" aria-label={t('设置')} aria-hidden={!open} inert={!open}
+    style={{ opacity: settingsOpacity, clipPath, pointerEvents: open ? 'auto' : 'none' }}>
     <div className={`settings-content settings-page-${page}${editingSky ? ' settings-editing-sky' : ''}`} key={page}>
     {editingSky && <SkySettingsEditor scene={skyScene} selectScene={setSkyScene} value={draft.appearance.sky} change={update => change(s => update(s.appearance.sky[skyScene]))} back={() => setSkyOpen(false)} />}
     {page === 'displays' && <>

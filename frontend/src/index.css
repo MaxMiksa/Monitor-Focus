@@ -381,3 +381,11 @@ input[type=number] { width: 104px; }
 /* Both the bar and its buttons follow content; all insets scale with focus height. */
 .scene-capsule-focus { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 6px; height: var(--nav-focus-size); padding: 0 15px; border-radius: 999px; corner-shape: round; font-size: var(--text-sm); line-height: 1.25; transition: background var(--duration), box-shadow var(--duration); }
 .scene-capsule[data-bar-style=icon] .scene-capsule-focus { width: var(--nav-focus-size); padding: 0; }
+
+/* A single empty glass shell morphs; content keeps its original dimensions. */
+.settings-morph-surface { position: absolute; z-index: 4; pointer-events: none; border: 1px solid; overflow: hidden; corner-shape: round; }
+.settings-morph-material { position: absolute; inset: 0; border-radius: inherit; }
+.settings-morph-capsule { background: linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.06) 48%,rgba(8,22,32,.32)), radial-gradient(circle at 16% 0%,rgba(255,255,255,.18),transparent 48%); }
+.settings-morph-panel { background: linear-gradient(125deg,rgba(255,249,230,.16),rgba(255,249,230,.035) 48%,rgba(18,26,32,.20)),rgba(27,30,37,.40); }
+.scene-capsule, .glass-strip, .settings-float { background: transparent; border-color: transparent; box-shadow: none; }
+.scene-capsule, .glass-strip { z-index: 5; }

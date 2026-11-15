@@ -9,6 +9,8 @@ import { useSceneBarStyle, useStageStyle } from '@/lib/stage-preference'
 import { LiveSceneStage } from '@/components/live-scene-stage'
 import { useWeatherRain } from '@/lib/weather'
 import { SkyEffects } from '@/components/sky-effects'
+import { SettingsMorphSurface } from '@/components/settings-morph'
+import { useSettingsMorph } from '@/components/settings-morph-context'
 import { SKY_PREVIEW_EVENT, skyScenes } from '@/lib/sky-preference'
 import type { Display, Snapshot } from '@/lib/control'
 import type { Send } from '@/App'
@@ -113,6 +115,7 @@ export function GlassStatus({ snapshot, error, send, close, sceneIds, embedded =
 }
 
 export function ScenePanel({ snapshot, send, error, openSettings, demo, settingsOpen, children }: { snapshot: Snapshot; send: Send; error: string; openSettings: () => void; demo: boolean; settingsOpen: boolean; children: ReactNode }) {
+  const { capsuleOpacity } = useSettingsMorph()
   const { t } = useI18n()
   const reduced = useReducedMotion()
   const [style] = useStageStyle()
@@ -247,18 +250,18 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
     })}</div>
 
     {live ? <>
-      <section className="scene-capsule" aria-label={t('场景')} data-bar-style={barStyle} hidden={fullBarOpen || settingsOpen}>
+      <motion.section className="scene-capsule" aria-label={t('场景')} data-bar-style={barStyle} aria-hidden={settingsOpen} inert={settingsOpen} style={{ opacity: capsuleOpacity }}>
         {sceneKeys.map(key => {
           const Icon = sceneIcons[key]
           return <Button key={key} variant="ghost" className="scene-capsule-button" data-active={scene === key} aria-label={t(sceneNames[key])} aria-pressed={scene === key} title={t(sceneNames[key])} onClick={() => change(key)}>
             <span className="scene-capsule-focus">{barStyle !== 'text' && <Icon aria-hidden="true" />}{barStyle !== 'icon' && <span>{t(sceneNames[key])}</span>}</span>
           </Button>
         })}
-      </section>
-      <AnimatePresence>{!fullBarOpen && !settingsOpen && <motion.button type="button" className="scene-expand-hint" aria-label={t('设置')} title={t('设置')} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={openSettings}><ChevronUp /></motion.button>}</AnimatePresence>
+      </motion.section>
+      <motion.button type="button" className="scene-expand-hint" aria-label={t('设置')} title={t('设置')} aria-hidden={settingsOpen} inert={settingsOpen} style={{ opacity: capsuleOpacity }} onClick={openSettings}><ChevronUp /></motion.button>
     </> : null}
 
-    <section className={`glass-strip${live ? ' glass-strip-expanded' : ''}`} aria-label={t('场景')} hidden={!fullBarOpen}>
+    <motion.section className={`glass-strip${live ? ' glass-strip-expanded' : ''}`} aria-label={t('场景')} hidden={live} aria-hidden={settingsOpen} inert={settingsOpen} style={{ opacity: capsuleOpacity }}>
       <div className="glass-levels">
         {displays.map((display, index) => <GlassSlider key={display.Id} display={display} label={t('{0}亮度', index === 1 ? t('笔记本屏幕') : display.Name)} onCommit={Value => send({ Action: 'brightness', Id: display.Id, Value })} />)}
         {displays.length === 0 && <p className="glass-empty">{t('正在检测显示器…')}</p>}
@@ -277,10 +280,11 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
           <Button variant="ghost" size="icon" className="glass-icon-button" aria-label={t('设置')} title={t('设置')} onClick={openSettings}><Settings2 /></Button>
         </div>
       </div>
-    </section>
+    </motion.section>
 
     <AnimatePresence>{more && fullBarOpen && <motion.div className={`glass-more${live ? ' glass-more-live' : ''}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: .18 }}><GlassStatus snapshot={snapshot} error={error} send={send} sceneIds={ids} close={() => setMore(false)} /></motion.div>}</AnimatePresence>
     {children}
+    <SettingsMorphSurface anchorKey={`${live}-${barStyle}`} />
     {missing && <p className="scene-missing" role="status">{missing}</p>}
     {demo && <p className="scene-demo" role="status">{t('此浏览器预览只展示界面，不控制硬件。')}</p>}
     {!(more && fullBarOpen) && (snapshot.Warning || snapshot.Error || error || snapshot.Displays.some(d => d.Error)) && <p className="scene-alert" role="alert"><AlertCircle />{[snapshot.Warning, snapshot.Error, error, ...snapshot.Displays.filter(d => d.Error).map(d => d.Error)].filter(Boolean).join(' · ')}</p>}

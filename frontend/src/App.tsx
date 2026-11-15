@@ -9,6 +9,7 @@ import type { Display, Request, Snapshot } from '@/lib/control'
 import { SettingsEditor } from '@/components/settings-editor'
 import type { SettingsEditorHandle } from '@/components/settings-editor'
 import { ScenePanel } from '@/components/scene-panel'
+import { SettingsMorph } from '@/components/settings-morph'
 
 export type Send = (command: Request) => Promise<Snapshot | null>
 export function Level({ value, max = 100, min = 0, step = 1, label, disabled, temperature, onCommit }: { value: number; max?: number; min?: number; step?: number; label: string; disabled?: boolean; temperature?: boolean; onCommit: (value: number) => void | Promise<unknown> }) {
@@ -90,9 +91,9 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [settingsOpen])
-  return <MotionConfig reducedMotion="user"><div className="scene-shell-root">
+  return <MotionConfig reducedMotion="user"><SettingsMorph open={settingsOpen}><div className="scene-shell-root">
     {!snapshot ? <div className="p-7"><h1>Monitors Focus</h1><p className="caption my-6">{message(error) || t('正在连接控制核心…')}</p><Button variant="outline" onClick={() => void send({ Action: 'snapshot' })}><RefreshCw />{t('重新连接')}</Button></div> : <ScenePanel snapshot={snapshot} send={sceneSend} error={error} demo={demo} settingsOpen={settingsOpen} openSettings={() => setSettingsOpen(true)}>
       <SettingsEditor ref={editor} open={settingsOpen} close={() => setSettingsOpen(false)} snapshot={snapshot} send={send} />
     </ScenePanel>}
-  </div></MotionConfig>
+  </div></SettingsMorph></MotionConfig>
 }
