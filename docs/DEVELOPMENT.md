@@ -101,3 +101,7 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 位置选择仅在非旧版云彩的天空设置中显示，四场景分别记忆，沿用自动保存／撤销。旧偏好缺少layout时回退original；未知layout也回退，不改写读取到的本地存储。旧版薄云与星星不受位置算法影响。
 
 部署包 build/packages/20261116-004217-009；目标／专注保留与唯一自启证据 cloud-placement-20261116-update.json，验证记录及界面截图位于 build/diagnostics/cloud-placement/。发布以552fb9f原生基线叠加本轮前端，未夹带未完成显示／恢复修改。
+
+星星闪烁：star-twinkle.ts 仅适配pmndrs星点材质，初始化一次逐星相位／频率／幅度属性；取消默认共享尺寸脉冲，用独立明暗曲线保留星点形状。每帧只更新时间，闪烁滑条控制强度，0和减少动态效果常亮。云彩与旧版薄云不改。设置收起修正：clipPath完成收拢后才淡出，天空编辑内容不因open=false提前换页，关闭期间inert与pointer-events禁止操作。
+
+当前正式包 build/packages/20261116-010947-929；部署目标／专注与唯一自启见 star-settings-fix-20261116-update.json，独立曲线及界面验证见 build/diagnostics/star-settings-fix/。收起中间截图保留玻璃与原内容、终态opacity0且inert；仅作本次短验收，不代表长期性能或完整减少动态效果验证。

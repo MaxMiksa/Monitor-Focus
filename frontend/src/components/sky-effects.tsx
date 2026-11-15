@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Scene, PerspectiveCamera, WebGLRenderer, TextureLoader, MeshBasicMaterial, Color, Vector3, SRGBColorSpace, Mesh, PlaneGeometry } from 'three'
+import { Scene, PerspectiveCamera, WebGLRenderer, TextureLoader, MeshBasicMaterial, Color, Vector3, SRGBColorSpace, Mesh, PlaneGeometry, ShaderMaterial } from 'three'
 import { Cloud, Clouds } from '@pmndrs/vanilla/core/Cloud'
 import { Stars } from '@pmndrs/vanilla/core/Stars'
 import { readSkyPreferences, SKY_EVENT } from '@/lib/sky-preference'
@@ -7,11 +7,12 @@ import type { StageKey } from '@/components/scene-panel'
 import type { SkySettings } from '@/lib/sky-preference'
 import { createLegacyMaterial } from '@/lib/cloud-legacy'
 import { cloudPlacements } from '@/lib/cloud-placement'
+import { independentStarTwinkle } from '@/lib/star-twinkle'
 
 const colors = { morning: '#fff1dc', midday: '#eef8ff', dusk: '#ffbb9a', night: '#7583b0' }
 
 // Upstream pmndrs components own the cloud particles and star shaders. This
-// adapter only supplies presets, scene clipping and our paused/throttled clock.
+// adapter supplies presets, independent star twinkle, clipping and a paused clock.
 export function SkyEffects({ scene, reduced }: { scene: StageKey; reduced: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const current = useRef({ scene, reduced })
@@ -32,6 +33,8 @@ export function SkyEffects({ scene, reduced }: { scene: StageKey; reduced: boole
     camera.position.set(0, 0, 18)
     camera.updateMatrixWorld()
     const stars = new Stars({ radius: 90, depth: 20, count: 18000, factor: 4, saturation: 0, fade: true, speed: 1 })
+    const starMaterial = stars.material as ShaderMaterial
+    independentStarTwinkle(stars.geometry, starMaterial)
     world.add(stars)
     const starColors = stars.geometry.getAttribute('color')
     const baseColors = Float32Array.from(starColors.array)
@@ -79,6 +82,7 @@ export function SkyEffects({ scene, reduced }: { scene: StageKey; reduced: boole
       const { stars: s, clouds: c } = settings
       placements = cloudPlacements(c, current.current.scene)
       stars.visible = s.enabled && s.count > 0 && s.brightness > 0
+      starMaterial.uniforms.twinkleStrength.value = current.current.reduced ? 0 : s.twinkle / 100
       stars.geometry.setDrawRange(0, Math.round((s.style === 'dense' ? 18000 : 1800) * s.count / 100))
       if (lastBrightness !== s.brightness) {
         const intensity = s.brightness / 100
@@ -136,7 +140,7 @@ export function SkyEffects({ scene, reduced }: { scene: StageKey; reduced: boole
       const now = performance.now(), delta = Math.min((now - lastTime) / 1000, .2)
       lastTime = now
       cloudTime += delta * settings.clouds.speed / 100
-      starTime += delta * settings.stars.twinkle / 100
+      starTime += delta
       render()
       if (animated()) timer = window.setTimeout(tick, 50)
     }

@@ -27,11 +27,11 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
   const [page, setPage] = useState<Page>('displays')
   const [skyOpen, setSkyOpen] = useState(false)
   const [skyScene, setSkyScene] = useState<StageKey>('night')
-  const editingSky = open && page === 'general' && skyOpen
+  const editingSky = page === 'general' && skyOpen
   useEffect(() => {
-    previewSky(editingSky ? skyScene : null)
+    previewSky(open && editingSky ? skyScene : null)
     return () => previewSky(null)
-  }, [editingSky, skyScene])
+  }, [open, editingSky, skyScene])
   const navigation = useRef<HTMLElement>(null)
   const { draft, change, undo, redo, reload, flush, saving, status, hasFailure, canUndo, canRedo } = useSettingsHistory(snapshot, send)
   const { stage: stageStyle, bar: barStyle } = draft.appearance
@@ -64,7 +64,10 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
   const deviceSend: Send = async command => await flush() ? send(command) : null
   return <motion.section className="settings-float" aria-label={t('设置')} aria-hidden={!open} inert={!open} initial={false}
     animate={open ? { opacity: 1, clipPath: 'inset(0% 0% 0% 0% round 28px)' } : { opacity: 0, clipPath: 'inset(88% 28% 0% 28% round 28px)' }}
-    transition={{ duration: .3, ease: [.22, .75, .2, 1] }} style={{ pointerEvents: open ? 'auto' : 'none' }}>
+    transition={{
+      clipPath: { duration: .3, ease: open ? [.22, .75, .2, 1] : [.4, 0, .78, .25] },
+      opacity: open ? { duration: .3, ease: [.22, .75, .2, 1] } : { delay: .24, duration: .06, ease: 'linear' },
+    }} style={{ pointerEvents: open ? 'auto' : 'none' }}>
     <div className={`settings-content settings-page-${page}${editingSky ? ' settings-editing-sky' : ''}`} key={page}>
     {editingSky && <SkySettingsEditor scene={skyScene} selectScene={setSkyScene} value={draft.appearance.sky} change={update => change(s => update(s.appearance.sky[skyScene]))} back={() => setSkyOpen(false)} />}
     {page === 'displays' && <>
