@@ -94,12 +94,10 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 全局下拉菜单复用 `frontend/src/components/ui/select.tsx` 的 Radix UI Select，浮层通过 Portal 避免设置内容区裁切，样式定义在 `index.css`。设置导航忽略 combobox／option 内的方向键，应用 Esc 让位于打开的菜单；组件关闭后恢复触发器焦点。
 
-## 临时云朵测试栏
+## 云彩位置分布
 
-首页顶部 `cloud-test-bar.tsx` 复用现有 Select／Slider；当前设置、无云对照与七款候选：旧版增强、Takram 积云／高层云、Three.js 官方体积云、MarchingCubes 两款卡通预设、现版 pmndrs。场景／浓度／速度仅驻留组件状态，不改正式偏好或硬件；恢复按钮、打开设置或关闭面板释放测试候选，测试栏本身保留以供快速比较。旧版增强也可在天空设置中保存。
+首页已撤下临时云朵测试栏与 Takram／体积／卡通候选、对应资源和依赖。保留 pmndrs 三种原有云彩和旧版薄云增强；cloud-legacy.ts 不改。cloud-placement.ts 为三组现有组件计算原有分布、分区散布、错落高度、弧形、远近深度五种位置；同场景／样式使用固定种子，不因刷新重新随机，移动围绕基准位置缓慢漂移。形状、纹理、浓度、速度与72实例上限不改，不增加画布或依赖。默认仍为原有分布。
 
-`cloud-lab-effects.tsx` 按需加载，单个候选画布，最高20fps；隐藏暂停，速度／浓度归零或减少动态效果时仅静态帧，切换释放自身资源。Takram 使用 three-clouds0.7.6／three-atmosphere0.19.1／three-geospatial0.9.1及postprocessing6.39.6，全部纹理打包到 scenes/cloud-lab，不请求远端资源。上游仍为Beta、开销较重，不能当作最终轻量选型结论。Three.js体积云改编官方r187例子；卡通复用维护中的MarchingCubes造型工具，是项目造型预设，不是专用成熟云组件。原站入口保留来源，许可证在两份notices中。
+位置选择仅在非旧版云彩的天空设置中显示，四场景分别记忆，沿用自动保存／撤销。旧偏好缺少layout时回退original；未知layout也回退，不改写读取到的本地存储。旧版薄云与星星不受位置算法影响。
 
-验收截图位于 build/diagnostics/cloud-research/。本轮仅做界面切换／可见度与构建检查，不将短测描述为长期性能或最终美术验收。发布用已提交原生基线隔离构建，不夹带工作区显示／恢复未完成修改。
-
-本轮正式部署：build/packages/20261116-002312-320；更新／唯一自启与硬件目标保留见 build/diagnostics/cloud-lab-20261116-update.json。界面候选、浓度端点、恢复释放及单次原生开关结果见 cloud-research/verification.json；原生截屏返回黑图未作证据，效果图为同源码浏览器预览。已保留最近五个正式包。
+部署包 build/packages/20261116-004217-009；目标／专注保留与唯一自启证据 cloud-placement-20261116-update.json，验证记录及界面截图位于 build/diagnostics/cloud-placement/。发布以552fb9f原生基线叠加本轮前端，未夹带未完成显示／恢复修改。

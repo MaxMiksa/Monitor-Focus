@@ -5,18 +5,18 @@ import { Stars } from '@pmndrs/vanilla/core/Stars'
 import { readSkyPreferences, SKY_EVENT } from '@/lib/sky-preference'
 import type { StageKey } from '@/components/scene-panel'
 import type { SkySettings } from '@/lib/sky-preference'
-import type { CloudLabSettings } from '@/lib/cloud-lab'
 import { createLegacyMaterial } from '@/lib/cloud-legacy'
+import { cloudPlacements } from '@/lib/cloud-placement'
 
 const colors = { morning: '#fff1dc', midday: '#eef8ff', dusk: '#ffbb9a', night: '#7583b0' }
 
 // Upstream pmndrs components own the cloud particles and star shaders. This
 // adapter only supplies presets, scene clipping and our paused/throttled clock.
-export function SkyEffects({ scene, reduced, cloudLab = null }: { scene: StageKey; reduced: boolean; cloudLab?: CloudLabSettings | null }) {
+export function SkyEffects({ scene, reduced }: { scene: StageKey; reduced: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const current = useRef({ scene, reduced, cloudLab })
+  const current = useRef({ scene, reduced })
   const refresh = useRef<(() => void) | null>(null)
-  useEffect(() => { current.current = { scene, reduced, cloudLab }; refresh.current?.() }, [scene, reduced, cloudLab])
+  useEffect(() => { current.current = { scene, reduced }; refresh.current?.() }, [scene, reduced])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -58,6 +58,7 @@ export function SkyEffects({ scene, reduced, cloudLab = null }: { scene: StageKe
     legacyClouds.renderOrder = 2
     world.add(legacyClouds)
     let settings: SkySettings = readSkyPreferences()[current.current.scene]
+    let placements = cloudPlacements(settings.clouds, current.current.scene)
     let timer = 0
     let lastTime = performance.now()
     let cloudTime = 0
@@ -75,9 +76,8 @@ export function SkyEffects({ scene, reduced, cloudLab = null }: { scene: StageKe
 
     const configure = () => {
       settings = readSkyPreferences()[current.current.scene]
-      const test = current.current.cloudLab
-      if (test) settings.clouds = { enabled: test.candidate === 'pmndrs', style: 'puffs', density: test.density, speed: test.speed }
       const { stars: s, clouds: c } = settings
+      placements = cloudPlacements(c, current.current.scene)
       stars.visible = s.enabled && s.count > 0 && s.brightness > 0
       stars.geometry.setDrawRange(0, Math.round((s.style === 'dense' ? 18000 : 1800) * s.count / 100))
       if (lastBrightness !== s.brightness) {
@@ -98,7 +98,8 @@ export function SkyEffects({ scene, reduced, cloudLab = null }: { scene: StageKe
         cloud.volume = c.style === 'puffs' ? 3.2 : c.style === 'layers' ? 1.8 : 1.15
         cloud.bounds.set(c.style === 'puffs' ? 2.5 : 5.2, c.style === 'puffs' ? .8 : .12, .4)
         cloud.scale.setScalar(1)
-        cloud.position.set((index - 1) * (c.style === 'puffs' ? 6.8 : 4.6), c.style === 'layers' ? .2 + index * 1.7 : 2.7 + (index % 2) * 1.2, -2 - index * .3)
+        const position = placements[index]
+        cloud.position.set(position.x, position.y, position.z)
         cloud.updateCloud()
         if (c.style !== 'puffs') cloud.cloudStateArray.forEach((particle, particleIndex) => {
           // Flattened wisps and strata keep horizontal billboards instead of
@@ -110,14 +111,19 @@ export function SkyEffects({ scene, reduced, cloudLab = null }: { scene: StageKe
       canvas.dataset.scene = current.current.scene
       canvas.dataset.starStyle = s.style
       canvas.dataset.cloudStyle = c.style
+      canvas.dataset.cloudLayout = c.style === 'legacy' ? 'legacy' : c.layout
       canvas.dataset.starCount = String(stars.geometry.drawRange.count)
     }
 
     const render = () => {
-      world.updateMatrixWorld(true)
       stars.update(starTime)
       legacy.material.uniforms.phase.value = cloudTime * .19
-      groups.forEach((cloud, index) => { cloud.position.x = (index - 1) * (settings.clouds.style === 'puffs' ? 6.8 : 4.6) + Math.sin(cloudTime * .09 + index * 1.7) * 1.6 })
+      groups.forEach((cloud, index) => {
+        const position = placements[index]
+        cloud.position.x = position.x + Math.sin(cloudTime * .09 + position.phase) * position.amplitude
+        cloud.position.y = position.y + Math.sin(cloudTime * .07 + position.phase) * position.vertical
+      })
+      world.updateMatrixWorld(true)
       clouds.update(camera, cloudTime, 0)
       renderer.render(world, camera)
       canvas.dataset.ready = 'true'

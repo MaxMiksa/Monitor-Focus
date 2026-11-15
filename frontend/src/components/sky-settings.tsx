@@ -4,7 +4,7 @@ import { Select } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { useI18n } from '@/lib/i18n-context'
-import { skyScenes } from '@/lib/sky-preference'
+import { cloudLayouts, skyScenes } from '@/lib/sky-preference'
 import type { SkyPreferences, SkySettings } from '@/lib/sky-preference'
 import type { StageKey } from '@/components/scene-panel'
 import type { TextKey } from '@/lib/i18n'
@@ -35,6 +35,7 @@ export function SkySettingsEditor({ scene, selectScene, value, change, back }: {
       <section className="sky-effect-card" aria-label={t('云彩')}>
         <div className="sky-effect-heading"><h2><CloudSun />{t('云彩')}</h2><Switch aria-label={t('显示云彩')} checked={sky.clouds.enabled} onCheckedChange={on => change(s => { s.clouds.enabled = on })} /></div>
         <Select aria-label={t('云彩样式')} value={sky.clouds.style} onValueChange={v => change(s => { s.clouds.style = v === 'legacy' || v === 'puffs' || v === 'layers' ? v : 'wisps' })} options={[{ value: 'legacy', label: '旧版薄云 · 增强' }, { value: 'wisps', label: t('轻薄流云') }, { value: 'puffs', label: t('蓬松云团') }, { value: 'layers', label: t('层叠云海') }]} />
+        {sky.clouds.style !== 'legacy' && <Select aria-label={t('云彩分布')} value={sky.clouds.layout} onValueChange={v => change(s => { s.clouds.layout = cloudLayouts.find(layout => layout === v) ?? 'original' })} options={cloudLayouts.map((layout, index) => ({ value: layout, label: t((['原有分布', '自然散布', '错落高低', '弧形环绕', '远近云层'] as const)[index]) }))} />}
         <SkySlider label="浓度" aria="云彩浓度" value={sky.clouds.density} change={v => change(s => { s.clouds.density = v })} />
         <SkySlider label="速度" aria="云彩速度" value={sky.clouds.speed} change={v => change(s => { s.clouds.speed = v })} />
       </section>

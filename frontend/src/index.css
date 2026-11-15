@@ -232,17 +232,6 @@ input[type=number] { width: 104px; }
 .settings-float [data-slot=switch-thumb][data-state=checked] { transform: translateX(15px); background: #9a8069; }
 .settings-float .settings-page-general { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 0 44px; align-content: center; padding-bottom: 24px; }
 .sky-effects-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; mask-image: url('/scenes/live/sky-mask.png'); mask-size: cover; mask-position: center; mask-repeat: no-repeat; }
-.cloud-test-bar { position: absolute; z-index: 12; top: 20px; left: 50%; transform: translateX(-50%); width: min(1040px,calc(100% - 40px)); display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border: 1px solid #ffffff70; border-radius: 22px; color: #fff; background: linear-gradient(120deg,#264657e8,#34464edb); box-shadow: 0 5px 20px #0002; font-size: 16px; }
-.cloud-test-heading { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
-.cloud-test-heading svg,.cloud-test-source svg { width: 19px; height: 19px; }
-.cloud-test-bar [data-slot=select-trigger] { width: 224px; min-height: 36px; }
-.cloud-test-bar [data-slot=select-trigger][aria-label="测试天空"] { width: 100px; }
-.cloud-test-bar [data-slot=button] { height: 34px; width: 30px; color: #fff; flex-shrink: 0; }
-.cloud-test-slider { display: flex; align-items: center; gap: 9px; white-space: nowrap; width: 176px; }
-.cloud-test-slider [data-slot=slider] { flex: 1; min-width: 48px; }
-.cloud-test-slider output { width: 40px; font-variant-numeric: tabular-nums; }
-.cloud-test-source { display: inline-flex; padding: 6px; color: inherit; }
-.cloud-lab-status { position: absolute; top: 115px; left: 50%; transform: translateX(-50%); z-index: 11; padding: 9px 16px; border-radius: 16px; background: #243b4be8; color: #fff; font-size: 16px; }
 .settings-float .settings-editing-sky { display: block; padding-top: 16px; padding-bottom: 8px; }
 .sky-settings { width: 100%; }
 .sky-settings-top { position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 18px; min-height: 38px; }

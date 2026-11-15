@@ -293,5 +293,11 @@
   "选择城市后跟随天气": "Choose a city to follow its weather",
   "停止雨景预览": "Stop rain preview",
   "预览雨景": "Preview rain",
-  "天气数据：Open-Meteo": "Weather: Open-Meteo"
+  "天气数据：Open-Meteo": "Weather: Open-Meteo",
+  "云彩分布": "Cloud placement",
+  "原有分布": "Original placement",
+  "自然散布": "Natural scatter",
+  "错落高低": "Staggered heights",
+  "弧形环绕": "Gentle arch",
+  "远近云层": "Near and far layers"
 }
