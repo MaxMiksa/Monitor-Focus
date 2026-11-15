@@ -67,7 +67,7 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 - 场景权重由 `scripts/export-scene-region-mask.py` 从对齐的中午原图按实际轮廓离线生成：天空 204、草地 166、机器 141；输出开发母版 `frontend/public/scene-morph-mask-v7.png` 和无损运行图 `frontend/public/scenes/live/mask.webp`。天空不再保留飞絮／星点白斑、横向灰带或扩大保护。空气／星点直接复用该天空轮廓，无近似地平线、中心椭圆或亮度保护；边界仅由纹理线性采样覆盖相邻像素，不额外模糊或膨胀。生成不进入运行时、不新增纹理或循环。
 
-- `frontend/src/index.css` 是唯一视觉参数入口；组件复用 shadcn 风格控件、Lucide 图标和 Motion 短反馈。重大界面改动先生成效果图并取得确认，再用与当前源码一致的真实截图核对。
+- `frontend/src/index.css` 是唯一视觉参数入口；全局字号为正文／按钮 16px、小标题 18px、页面标题 26px，胶囊文字行高 1.25，固定面板不随字号或视口改变尺寸；组件复用 shadcn 风格控件、Lucide 图标和 Motion 短反馈。重大界面改动先生成效果图并取得确认，再用与当前源码一致的真实截图核对。
 - 快捷面板与设置页共用 1168 × 657 DIP（较上一版宽高再增约 10%；最小宽 1024 DIP） 的 16:9 客户区；`window_ratio_windows.go` 用 `WM_SIZING` 和窗口尺寸事件锁定比例，`main.go` 在首次显示及系统贴靠／最大化后恢复并居中。`resizePanel` 仅保留兼容动作，不再切换窗口尺寸。
 - `frontend/public/scenes/` 保存当前版早 / 中 / 傍晚 / 夜四张无文字、无组件的整页 16:9 原创 WebP；`frontend/public/scenes/live/` 保存新版同机位四张 WebP 和一张灰度权重 WebP。仅供开发使用的四张高清 PNG、v7 权重图和 `scene-motion-prototype.html` 留在 `frontend/public/`，Vite 构建结束阶段由 `excludeDevelopmentAssets` 插件从 `frontend/dist` 删除，不进入 exe。正式构建只嵌入场景资源；运行时不请求远程图片或视频，不引入视频解码依赖。真实控件由 React 绘制，避免图片中的按钮与可操作热区错位。
 - 新版舞台的 `LiveSceneStage` 默认启用，「设置 → 通用 → 主界面样式」可切回当前版；偏好存于 `localStorage` 并由 `storage` 事件同步，不进入 Go `Settings`、不改 Revision 或配置迁移。常态仅一张全尺寸画面、一张权重图、一张 128×128 单通道噪声纹理和一张 640×320 飞絮天空补片图集；切换时临时多一张目标画面，完成后直接交换并释放旧纹理，不再重复上传。隐藏、减少动态效果时停止循环；WebGL 初始化失败释放上下文并按当前场景显示原始静态图。
