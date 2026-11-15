@@ -10,6 +10,7 @@ const layers = [
 const rateAt = (layer, amount) => layer.rate * amount + layer.extra * amount ** 3
 const MAX_RAIN = 2400
 const MAX_SPLASH = 144
+const MAX_ARCS = 24
 
 function behavior(type, initialize, update) {
   return { type, initialize, update, frameUpdate() {}, reset() {}, clone() { return this }, toJSON() { return { type } } }
@@ -52,7 +53,14 @@ export function createWindRain(slot, report) {
     gradient.addColorStop(1, 'rgba(215,235,245,0)')
     ctx.fillStyle = gradient; ctx.fillRect(0, 0, 16, 16)
   })
-  const materials = [rainTexture, splashTexture].map(map => new T.MeshBasicMaterial({ map, transparent: true, depthWrite: false, depthTest: false }))
+  const arcTexture = texture(64, 64, ctx => {
+    ctx.strokeStyle = 'rgba(223,246,255,.95)'; ctx.lineWidth = 2.6; ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.moveTo(11, 43); ctx.quadraticCurveTo(10, 19, 26, 39)
+    ctx.quadraticCurveTo(40, 12, 53, 38)
+    ctx.stroke()
+  })
+  const materials = [rainTexture, splashTexture, arcTexture].map(map => new T.MeshBasicMaterial({ map, transparent: true, depthWrite: false, depthTest: false }))
   let amount = .75, paused = true, disposed = false, timer = 0, phase = 0, hits = 0, splashEnabled = true
   let width = 1, height = 1, scale = 1, offsetX = 0, offsetY = 0
   let lastTime = performance.now(), statsTime = lastTime, frames = 0
@@ -60,28 +68,49 @@ export function createWindRain(slot, report) {
   const projected = new T.Vector3(), predicted = new T.Vector3(), impact = new T.Vector3()
   const impactMatrix = new T.Matrix4()
   const burst = { isBursting: false, burstParticleIndex: 0, burstParticleCount: 0, burstIndex: 0, burstWaveIndex: 0, time: 0, waitEmiting: 0, travelDistance: 0 }
+  // Express splash dimensions in background pixels, independent of rain depth.
+  const sourceUnit = particle => scale * 2 * (camera.position.z - particle.position.z) * Math.tan(Math.PI / 10) / height
   const splashes = new Q.ParticleSystem({
     duration: 1, looping: true, onlyUsedByOther: true, worldSpace: true,
     material: materials[1], renderMode: Q.RenderMode.BillBoard, renderOrder: 4,
     shape: new Q.PointEmitter(), emissionOverTime: new Q.ConstantValue(0),
     emissionBursts: [{ time: 0, count: new Q.ConstantValue(2), cycle: 1, interval: 0, probability: 1 }],
-    startLife: new Q.IntervalValue(.16, .3), startSpeed: new Q.ConstantValue(0),
-    startSize: new Q.IntervalValue(.035, .08),
-    startColor: new Q.ColorRange(new T.Vector4(.85, .93, .98, .35), new T.Vector4(.95, .98, 1, .65)),
+    startLife: new Q.IntervalValue(.3, .44), startSpeed: new Q.ConstantValue(0),
+    startSize: new Q.IntervalValue(4, 7),
+    startColor: new Q.ColorRange(new T.Vector4(.75, .92, 1, .85), new T.Vector4(.95, .99, 1, .98)),
     behaviors: [behavior('WindSplash', particle => {
-      particle.velocity.set(-.35 + (Math.random() - .5) * 1.4, .6 + Math.random() * .8, 0)
+      const unit = sourceUnit(particle)
+      particle.splashUnit = unit
+      particle.startSize.multiplyScalar(unit); particle.size.copy(particle.startSize)
+      particle.velocity.set((-30 + (Math.random() - .5) * 140) * unit, (95 + Math.random() * 65) * unit, 0)
     }, (particle, delta) => {
-      particle.velocity.y -= 7 * delta
-      particle.velocity.x -= .5 * delta
-      particle.color.w = particle.startColor.w * (1 - particle.age / particle.life) ** 2
+      particle.velocity.y -= 650 * particle.splashUnit * delta
+      particle.velocity.x -= 35 * particle.splashUnit * delta
+      particle.color.w = particle.startColor.w * (1 - particle.age / particle.life)
     })],
   })
-  function emitSplash(position) {
-    if (splashes.particleNum > MAX_SPLASH - 2) return
+  const arcs = new Q.ParticleSystem({
+    duration: 1, looping: true, onlyUsedByOther: true, worldSpace: true,
+    material: materials[2], renderMode: Q.RenderMode.BillBoard, renderOrder: 5,
+    shape: new Q.PointEmitter(), emissionOverTime: new Q.ConstantValue(0),
+    emissionBursts: [{ time: 0, count: new Q.ConstantValue(1), cycle: 1, interval: 0, probability: 1 }],
+    startLife: new Q.IntervalValue(.2, .28), startSpeed: new Q.ConstantValue(0),
+    startSize: new Q.IntervalValue(20, 30), startColor: new Q.ConstantColor(new T.Vector4(.8, .94, 1, .85)),
+    behaviors: [behavior('RoofArc', particle => {
+      const unit = sourceUnit(particle)
+      particle.startSize.multiplyScalar(unit); particle.size.copy(particle.startSize)
+      particle.position.y += 4 * unit
+    }, particle => {
+      const progress = particle.age / particle.life
+      particle.size.copy(particle.startSize).multiplyScalar(.75 + progress * .45)
+      particle.color.w = particle.startColor.w * (1 - progress)
+    })],
+  })
+  function emitAt(system, position) {
     burst.isBursting = false; burst.burstIndex = 0; burst.burstWaveIndex = 0
     burst.time = 0; burst.waitEmiting = 0
     impactMatrix.makeTranslation(position.x, position.y, position.z)
-    splashes.emit(0, burst, impactMatrix)
+    system.emit(0, burst, impactMatrix)
   }
   // Project onto the same cover-fitted source image as the background.
   function sourcePoint(vector) {
@@ -109,7 +138,10 @@ export function createWindRain(slot, report) {
       impact.copy(particle.position).addScaledVector(particle.velocity, delta * fraction)
       hits++
       // Roof accents only: the original rain continues without any blocking.
-      if (splashEnabled && Math.random() < .65) emitSplash(impact)
+      if (splashEnabled) {
+        if (splashes.particleNum <= MAX_SPLASH - 2 && Math.random() < .35) emitAt(splashes, impact)
+        if (arcs.particleNum < MAX_ARCS && Math.random() < .18) emitAt(arcs, impact)
+      }
     })
     const system = new Q.ParticleSystem({
       duration: 2, looping: true, worldSpace: true,
@@ -127,14 +159,16 @@ export function createWindRain(slot, report) {
     systems.push({ system, rate, layer })
   })
   scene.add(splashes.emitter); batch.addSystem(splashes)
+  scene.add(arcs.emitter); batch.addSystem(arcs)
   function publish(fps) {
     const count = systems.reduce((sum, entry) => sum + entry.system.particleNum, 0)
-    canvas.dataset.rain = String(count); canvas.dataset.splash = String(splashes.particleNum)
+    canvas.dataset.rain = String(count); canvas.dataset.splash = String(splashes.particleNum + arcs.particleNum)
+    canvas.dataset.arcs = String(arcs.particleNum)
     canvas.dataset.hits = String(hits); canvas.dataset.phase = phase.toFixed(3)
     canvas.dataset.splashEnabled = String(splashEnabled)
     canvas.dataset.rainRate = String(Math.round(systems.reduce((sum, entry) => sum + entry.rate.value, 0)))
     canvas.dataset.textures = String(renderer.info.memory.textures)
-    report(count, fps, splashes.particleNum)
+    report(count, fps, splashes.particleNum + arcs.particleNum)
   }
   function resize() {
     width = Math.max(1, slot.clientWidth); height = Math.max(1, slot.clientHeight)
@@ -142,7 +176,7 @@ export function createWindRain(slot, report) {
     offsetX = (width - 1672 * scale) / 2; offsetY = (height - 941 * scale) / 2
     renderer.setSize(width, height, false)
     camera.aspect = width / height; camera.updateProjectionMatrix()
-    systems.forEach(({ system }) => system.restart()); splashes.restart()
+    systems.forEach(({ system }) => system.restart()); splashes.restart(); arcs.restart()
     batch.update(0); renderer.render(scene, camera)
   }
   function tick() {
@@ -159,14 +193,14 @@ export function createWindRain(slot, report) {
   return {
     setSplashes(value) {
       splashEnabled = value
-      if (!value) { splashes.restart(); batch.update(0); renderer.render(scene, camera) }
+      if (!value) { splashes.restart(); arcs.restart(); batch.update(0); renderer.render(scene, camera) }
       publish()
     },
     setAmount(value) {
       amount = Math.max(0, Math.min(1, value))
       systems.forEach(({ rate, layer }) => { rate.value = rateAt(layer, amount) })
       if (!amount) {
-        systems.forEach(({ system }) => system.restart()); splashes.restart()
+        systems.forEach(({ system }) => system.restart()); splashes.restart(); arcs.restart()
         batch.update(0); renderer.clear()
       }
       publish()
@@ -178,10 +212,10 @@ export function createWindRain(slot, report) {
     },
     dispose() {
       disposed = true; clearTimeout(timer); observer.disconnect()
-      systems.forEach(({ system }) => system.dispose()); splashes.dispose()
+      systems.forEach(({ system }) => system.dispose()); splashes.dispose(); arcs.dispose()
       batch.batches.forEach(entry => entry.dispose())
       materials.forEach(entry => entry.dispose())
-      rainTexture.dispose(); splashTexture.dispose()
+      rainTexture.dispose(); splashTexture.dispose(); arcTexture.dispose()
       renderer.dispose(); renderer.forceContextLoss(); slot.remove()
     },
   }
