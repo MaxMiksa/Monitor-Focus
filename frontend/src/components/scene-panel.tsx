@@ -151,22 +151,19 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
   const [more, setMore] = useState(false)
   const [missing, setMissing] = useState('')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const scheduleScene = useRef<SceneKey | null>(null)
   const previousExternal = useRef<SceneKey | null>(sourceScene ?? timeScene)
   const syncedScene = useRef<SceneKey>(initial())
+  const requestSerial = useRef(0)
+  const pendingRequest = useRef<number | null>(null)
   const externalNow = sourceScene ?? timeScene
-  const [external, setExternal] = useState<SceneKey | null>(externalNow)
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
 
-  const change = useCallback((next: SceneKey) => {
-    if (next === scene) return
-    const id = ids[next]
-    if (!id) { setMissing(t('未找到对应场景，可在设置中添加')); return }
-    setMissing('')
-    const from = scene
-    setScene(next)
+  const presentScene = useCallback((next: SceneKey) => {
+    if (next === syncedScene.current) return
+    const from = syncedScene.current
+    // Advance immediately: several events can arrive before React paints.
     syncedScene.current = next
-    scheduleScene.current = null
+    setScene(next)
     setTransition(value => value + 1)
     if (reduced) setStage(next)
     if (timer.current) clearTimeout(timer.current)
@@ -175,45 +172,43 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
       setStage('dusk')
       timer.current = setTimeout(() => { setStage(next); timer.current = null }, 300)
     } else setStage(next)
-    void send({ Action: 'scene', Id: id }).catch(() => {})
-  }, [ids, live, reduced, scene, send, t])
+  }, [live, reduced])
+
+  const change = useCallback((next: SceneKey) => {
+    if (next === syncedScene.current) return
+    const id = ids[next]
+    if (!id) { setMissing(t('未找到对应场景，可在设置中添加')); return }
+    setMissing('')
+    const serial = ++requestSerial.current
+    pendingRequest.current = serial
+    presentScene(next)
+    const settle = (result: Snapshot | null) => {
+      if (pendingRequest.current !== serial) return
+      pendingRequest.current = null
+      if (!result && previousExternal.current) presentScene(previousExternal.current)
+    }
+    void send({ Action: 'scene', Id: id }).then(settle, () => settle(null))
+  }, [ids, presentScene, send, t])
 
   useEffect(() => {
-    if (externalNow !== previousExternal.current) {
-      previousExternal.current = externalNow
-      const task = window.setTimeout(() => setExternal(externalNow), 0)
-      return () => window.clearTimeout(task)
-    }
-    const next = external
-    if (!next || next === syncedScene.current || scheduleScene.current) return
-    scheduleScene.current = next
+    const changed = externalNow !== previousExternal.current
+    previousExternal.current = externalNow
+    // Native writes remain serialized. Their intermediate acknowledgements
+    // must not replace a newer local selection while requests are pending.
+    if (!changed || !externalNow || pendingRequest.current !== null) return
+    const next = externalNow
     const task = window.setTimeout(() => {
-      if (scheduleScene.current !== next) return
-      const from = syncedScene.current
-      syncedScene.current = next
-      setScene(next)
-      if (timer.current) clearTimeout(timer.current)
-      if (reduced) { setStage(next); scheduleScene.current = null; return }
-      if (!live && sceneKeys.indexOf(next) - sceneKeys.indexOf(from) > 1) {
-        setStage('dusk')
-        timer.current = setTimeout(() => {
-          if (scheduleScene.current !== next) return
-          setStage(next); scheduleScene.current = null; timer.current = null
-        }, 300)
-      } else {
-        setStage(next)
-        scheduleScene.current = null
-      }
+      if (pendingRequest.current === null && previousExternal.current === next) presentScene(next)
     }, 0)
     return () => window.clearTimeout(task)
-  }, [externalNow, external, live, reduced])
+  }, [externalNow, presentScene])
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null
       if (settingsOpen || event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || target?.closest('input, select, textarea, [role=slider], [contenteditable=true]')) return
       {
-        const index = sceneKeys.indexOf(scene)
+        const index = sceneKeys.indexOf(syncedScene.current)
         if (['ArrowLeft', 'ArrowRight', 'a', 'A', 'd', 'D'].includes(event.key)) {
           event.preventDefault()
           change(sceneKeys[(index + (['ArrowRight', 'd', 'D'].includes(event.key) ? 1 : -1) + sceneKeys.length) % sceneKeys.length])
@@ -226,7 +221,7 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [change, scene, settingsOpen, openSettings])
+  }, [change, settingsOpen, openSettings])
 
   const displays = snapshot.Displays.slice(0, 2)
   const visibleStage = settingsOpen && skyPreview ? skyPreview : stage

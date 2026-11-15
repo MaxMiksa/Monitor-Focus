@@ -100,14 +100,16 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 位置选择仅在非旧版云彩的天空设置中显示，四场景分别记忆，沿用自动保存／撤销。旧偏好缺少layout时回退original；未知layout也回退，不改写读取到的本地存储。旧版薄云与星星不受位置算法影响。
 
-部署包 build/packages/20261116-004217-009；目标／专注保留与唯一自启证据 cloud-placement-20261116-update.json，验证记录及界面截图位于 build/diagnostics/cloud-placement/。发布以552fb9f原生基线叠加本轮前端，未夹带未完成显示／恢复修改。
+部署包 build/packages/20261116-004217-009；目标／专注保留与唯一自启证据 cloud-placement-20261116-update.json，验证记录及界面截图位于 build/diagnostics/cloud-placement/。
 
 星星闪烁：star-twinkle.ts 仅适配pmndrs星点材质，初始化一次逐星相位／频率／幅度属性；取消默认共享尺寸脉冲，用独立明暗曲线保留星点形状。每帧只更新时间，闪烁滑条控制强度，0和减少动态效果常亮。云彩与旧版薄云不改。设置收起修正：clipPath完成收拢后才淡出，天空编辑内容不因open=false提前换页，关闭期间inert与pointer-events禁止操作。
 
 ## 连续场景过渡
 
+`ScenePanel` 以同步 ref 记录最新选择，按键和点击不依赖上一帧 React 状态；请求序号只允许最新手动请求结束等待，串行硬件中间回报不覆盖新目标，结束后恢复外部场景同步。仅增加常量状态，不增加画布／纹理／历史快照。`build/diagnostics/scene-input-fix/verification.json` 记录同帧正反向三次、两条中间回报与等待结束后的外部同步；浏览器使用真实组件和受控回报，不写硬件。
+
 - `LiveSceneStage` 不再等待进行中或过时的加载结束：新目标取消旧图片加载，加载完成后再次核对最新目标；废弃请求不得清空新请求状态。中断时从最后已显示的进度与飞絮相位衔接，单次 GPU FBO 合成、不 `readPixels` 或 CPU 拷贝。
 - 纹理按显示宽度生成且不超过 1672×941，RGBA 快照理论上限约 6.29 MB；中断瞬时最多三张场景纹理，过渡两张、空闲一张，另有共用 mask／飞絮图集，不常驻四场景。雨景后处理不写入快照，飞絮只修补新目标；快照失败保留当前画面。隐藏或减少动态效果时直接切到目标；卸载取消加载并释放纹理与上下文。硬件请求仍串行，取消画面过渡不等于取消在途硬件调用。
 - 验收：快速三场景切换、真实 WebGL 晴天／雨天衔接与过时加载均通过，平均 8 位像素差 0.09～0.22，无 GL 错误；峰值 5、空闲 3、销毁 0 张纹理（均含共用 mask／图集）。证据为 `build/diagnostics/scene-interrupt/gpu-check.json`，正式构建日志见同目录 `production-build.log`。未验证长期 CPU／显存走势或所有机器的流畅度。
 
-当前正式包为 `build/packages/20261116-023317-887/`；部署目标／专注与唯一自启见 `build/diagnostics/scene-interrupt-20261116-update.json`。发布未夹带未完成的显示／恢复修改。
+当前正式包为 `build/packages/20261116-031120-009/`；部署目标／专注保留与唯一自启见 `build/diagnostics/scene-input-fix-20261116-update.json`。发布以已提交原生基线叠加本次输入与文档修改，未夹带未完成的显示／恢复修改。
