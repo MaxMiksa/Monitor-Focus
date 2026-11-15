@@ -330,7 +330,7 @@ func (h *Host) open() {
 		if h.production {
 			title = "Monitors Focus"
 		}
-		w := h.app.Window.NewWithOptions(application.WebviewWindowOptions{Name: fmt.Sprintf("panel-%d", serial), Title: title, Width: 960, Height: 540, URL: url, Frameless: true, DisableResize: false, DevToolsEnabled: h.dev || h.inspect, BackgroundColour: application.NewRGB(247, 249, 252), Windows: application.WindowsWindow{NonClientRegionSupport: true}})
+		w := h.app.Window.NewWithOptions(application.WebviewWindowOptions{Name: fmt.Sprintf("panel-%d", serial), Title: title, Width: panelClientWide, Height: panelClientHigh, URL: url, Frameless: true, DisableResize: false, DevToolsEnabled: h.dev || h.inspect, BackgroundColour: application.NewRGB(247, 249, 252), Windows: application.WindowsWindow{NonClientRegionSupport: true}})
 		h.window = w
 		setFixedRatioWindow(uintptr(w.NativeWindow()))
 		w.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
@@ -344,7 +344,7 @@ func (h *Host) open() {
 			if err := setPanelIcon(uintptr(w.NativeWindow())); err != nil {
 				h.record("window-icon-error", map[string]any{"error": err.Error()})
 			}
-			applyFixedRatioSize(uintptr(w.NativeWindow()), 960, 540)
+			applyFixedRatioSize(uintptr(w.NativeWindow()), panelClientWide, panelClientHigh)
 			// STARTUPINFO can hide the first ShowWindow when the tray process was
 			// launched with SW_HIDE. A later user open must explicitly show it.
 			w.Show()
@@ -401,7 +401,7 @@ func (h *Host) receive(w application.Window, message string, origin *application
 				if w.IsMaximised() {
 					w.Restore()
 				}
-				applyFixedRatioSize(uintptr(w.NativeWindow()), 960, 540)
+				applyFixedRatioSize(uintptr(w.NativeWindow()), panelClientWide, panelClientHigh)
 				w.Center()
 			case "window-close":
 				w.Close()

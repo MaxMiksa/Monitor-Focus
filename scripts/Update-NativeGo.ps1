@@ -51,3 +51,6 @@ try {
         if($wasOpen){$null=Send-Go @{Action='host-open'}}
     }
 }
+if($updated){
+    & "$PSScriptRoot/Remove-OldPackages.ps1" | ConvertTo-Json -Depth 4 | Set-Content "$evidence/$EvidencePrefix-retention.json"
+}

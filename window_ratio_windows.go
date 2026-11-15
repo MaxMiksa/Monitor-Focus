@@ -13,8 +13,8 @@ import (
 // rect supplied by Windows, so this also works during a live border drag.
 const (
 	wmSizing        = 0x0214
-	panelClientWide = 960
-	panelClientHigh = 540
+	panelClientWide = 1056
+	panelClientHigh = 594
 	minClientWide   = 720
 	maxClientWide   = 2560
 	wmszTop         = 3

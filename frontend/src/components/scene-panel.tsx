@@ -242,7 +242,7 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
         {sceneKeys.map(key => {
           const Icon = sceneIcons[key]
           return <Button key={key} variant="ghost" className="scene-capsule-button" data-active={scene === key} aria-label={t(sceneNames[key])} aria-pressed={scene === key} title={t(sceneNames[key])} onClick={() => change(key)}>
-            {barStyle !== 'text' && <Icon aria-hidden="true" />}{barStyle !== 'icon' && <span>{t(sceneNames[key])}</span>}
+            <span className="scene-capsule-focus">{barStyle !== 'text' && <Icon aria-hidden="true" />}{barStyle !== 'icon' && <span>{t(sceneNames[key])}</span>}</span>
           </Button>
         })}
       </section>
