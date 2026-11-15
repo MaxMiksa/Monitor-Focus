@@ -11,6 +11,7 @@ const presets = [
 let selected = 4, amount = .75, paused = false, baseline = false
 let active = null, revision = 0, saved = null
 let splashEnabled = true
+let moodEnabled = true, currentScene = 'midday'
 const frameBudget = 30
 try {
   const remembered = JSON.parse(localStorage.getItem('monitors-focus.rain-gallery-choice') || 'null')
@@ -49,13 +50,19 @@ function present() {
   $('#source').href = presets[selected].url
   $('#splash').hidden = presets[selected].id !== 'wind'
   $('#splash').setAttribute('aria-pressed', String(splashEnabled))
+  $('#mood').hidden = presets[selected].id !== 'wind'
+  $('#mood').setAttribute('aria-pressed', String(moodEnabled))
+  const rainyMood = presets[selected].id === 'wind' && moodEnabled && !baseline && amount > 0
+  document.body.classList.toggle('rainy-mood', rainyMood)
+  document.body.dataset.scene = currentScene
   document.body.classList.toggle('local-cloud', presets[selected].kind === 'local')
   const value = Math.round(amount * 100)
   $('#intensity-value').textContent = `${value} · ${value === 0 ? '无雨' : value < 30 ? '小雨' : value < 70 ? '中雨' : '大雨'}`
   $('#baseline').setAttribute('aria-pressed', String(baseline))
   $('#pause').setAttribute('aria-pressed', String(paused))
   $('#pause').textContent = paused ? '继续' : '暂停'
-  $('#atmosphere').style.opacity = baseline || presets[selected].kind === 'local' ? '0' : String(.25 + amount * .55)
+  $('#atmosphere').style.opacity = baseline || presets[selected].kind === 'local' || (presets[selected].id === 'wind' && !rainyMood)
+    ? '0' : String(rainyMood ? (currentScene === 'night' ? .4 : .7) + amount * .25 : .25 + amount * .55)
   host.style.visibility = baseline ? 'hidden' : 'visible'
   $('#chosen').textContent = saved ? `已记住：${saved.name} · 雨量 ${saved.intensity}` : ''
 }
@@ -281,12 +288,15 @@ function updateAmount(value) {
 $('#intensity').addEventListener('input', event => updateAmount(event.target.value))
 document.querySelectorAll('[data-intensity]').forEach(button => button.addEventListener('click', () => updateAmount(button.dataset.intensity)))
 document.querySelectorAll('[data-scene]').forEach(button => button.addEventListener('click', () => {
+  currentScene = button.dataset.scene
   $('#backdrop').style.backgroundImage = `url('/scenes/live/${button.dataset.scene}.webp')`
   document.querySelectorAll('[data-scene]').forEach(other => other.setAttribute('aria-pressed', String(other === button)))
+  present()
 }))
 $('#baseline').addEventListener('click', () => { baseline = !baseline; synchronize() })
 $('#pause').addEventListener('click', () => { paused = !paused; synchronize() })
 $('#splash').addEventListener('click', () => { splashEnabled = !splashEnabled; synchronize() })
+$('#mood').addEventListener('click', () => { moodEnabled = !moodEnabled; present() })
 $('#choose').addEventListener('click', () => {
   saved = { id: presets[selected].id, name: presets[selected].name, intensity: Math.round(amount * 100) }
   // Preview choice is isolated from application weather/settings state.

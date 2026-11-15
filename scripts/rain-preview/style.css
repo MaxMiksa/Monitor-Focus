@@ -10,3 +10,16 @@
 #effect canvas.local-rain-canvas{inset:auto!important;width:var(--rain-width)!important;height:var(--rain-height)!important;left:var(--rain-left)!important;top:var(--rain-top)!important}
 @media(max-width:800px){.choices{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:560px){.choices{grid-template-columns:repeat(2,1fr)}}
+
+/* Static translucent gradients reuse the existing overlay: no blur, filter or clock. */
+.rainy-mood #atmosphere{
+  mix-blend-mode:normal;
+  background:
+    radial-gradient(ellipse at 22% -15%,#15212e80 0%,transparent 65%),
+    linear-gradient(180deg,#273a4dd9 0%,#5269778c 36%,#7d919c45 60%,#b0c2c72b 70%,#53697418 84%,#192c392e 100%);
+}
+.rainy-mood[data-scene=night] #atmosphere{
+  background:linear-gradient(180deg,#17263670,#5265752e 48%,#92aab92b 70%,transparent 95%);
+}
+.playback{flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:800px){.toolbar{gap:16px}.playback{gap:6px;max-width:60%}.playback button{padding:8px 12px}}
