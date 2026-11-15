@@ -5,10 +5,12 @@ const IMAGE = { width: 1672, height: 941 }
 const REGION = { left: 566, top: 65, width: 540, height: 420 }
 const ROOF = { left: 722, right: 945, y: 378 }
 const CLOUD = { x: 836, y: 204, width: 410 }
-const MAX_RAIN = 96
+const MAX_RAIN = 320
 const MAX_DROPLETS = 128
 const MAX_CROWNS = 32
 const FPS = 30
+// Keep fine rain sparse, then open up the upper end to four times the old rate.
+const rainPerSecond = strength => 180 * strength + 540 * strength ** 3
 
 function sprite(width, height, paint) {
   const canvas = document.createElement('canvas')
@@ -34,7 +36,7 @@ export async function createLocalCloud(slot, report) {
     const response = await fetch('/raincloud.png', { signal: aborter.signal })
     if (!response.ok) throw new Error('雨云图片加载失败')
     const blob = await response.blob()
-    bitmap = await createImageBitmap(blob, { resizeWidth: 512, resizeQuality: 'high', imageOrientation: 'flipY' })
+    bitmap = await createImageBitmap(blob, { resizeWidth: 512, resizeQuality: 'high', imageOrientation: 'flipY', premultiplyAlpha: 'none' })
     if (!slot.isConnected) throw new Error('Preview switched during loading')
   } catch (error) { bitmap?.close(); throw error }
   finally { window.removeEventListener('pagehide', onPageHide) }
@@ -59,6 +61,20 @@ export async function createLocalCloud(slot, report) {
   cloudTexture.needsUpdate = true
   const cloudGeometry = new T.PlaneGeometry(CLOUD.width, CLOUD.width * bitmap.height / bitmap.width)
   const cloudMaterial = new T.MeshBasicMaterial({ map: cloudTexture, transparent: true, depthWrite: false, depthTest: false })
+  // Trim the remaining matte fringe and feather alpha without another texture.
+  cloudMaterial.onBeforeCompile = shader => {
+    shader.uniforms.cloudTexel = { value: new T.Vector2(1 / bitmap.width, 1 / bitmap.height) }
+    shader.fragmentShader = 'uniform vec2 cloudTexel;\n' + shader.fragmentShader
+    shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
+      #include <map_fragment>
+      vec2 feather = cloudTexel * 2.0;
+      float edgeAlpha = min(
+        min(texture2D(map, vMapUv + vec2(feather.x, 0.0)).a, texture2D(map, vMapUv - vec2(feather.x, 0.0)).a),
+        min(texture2D(map, vMapUv + vec2(0.0, feather.y)).a, texture2D(map, vMapUv - vec2(0.0, feather.y)).a)
+      );
+      diffuseColor.a *= smoothstep(0.08, 0.95, edgeAlpha);
+    `)
+  }
   const cloud = new T.Mesh(cloudGeometry, cloudMaterial)
   cloud.position.set(CLOUD.x, -CLOUD.y, 3)
   cloud.renderOrder = 5
@@ -135,7 +151,7 @@ export async function createLocalCloud(slot, report) {
       particle.color.w = particle.startColor.w * Math.max(0, 1 - progress)
     })],
   })
-  const rainRate = new Q.ConstantValue(180 * strength)
+  const rainRate = new Q.ConstantValue(rainPerSecond(strength))
   const roofY = x => ROOF.y + Math.max(0, 732 - x) * .35 + Math.max(0, x - 936) * .35
   const rain = new Q.ParticleSystem({
     duration: 1, looping: true, worldSpace: true, material: materials[0],
@@ -169,6 +185,7 @@ export async function createLocalCloud(slot, report) {
   systems.forEach(system => { scene.add(system.emitter); batch.addSystem(system) })
   const publish = fps => {
     canvas.dataset.rain = String(rain.particleNum)
+    canvas.dataset.rainRate = String(Math.round(rainRate.value))
     canvas.dataset.splash = String(droplets.particleNum + crowns.particleNum)
     canvas.dataset.hits = String(hits)
     canvas.dataset.phase = phase.toFixed(3)
@@ -211,7 +228,7 @@ export async function createLocalCloud(slot, report) {
   return {
     setAmount(value) {
       strength = Math.max(0, Math.min(1, value))
-      rainRate.value = 180 * strength
+      rainRate.value = rainPerSecond(strength)
       cloud.visible = strength > 0
       if (!strength) {
         systems.forEach(system => system.restart())
