@@ -148,7 +148,7 @@ function loadImage(url: string, signal: AbortSignal): Promise<HTMLImageElement> 
     }
     const abort = () => { cleanup(); image.src = ''; reject(new DOMException('aborted', 'AbortError')) }
     image.onload = () => { cleanup(); resolve(image) }
-    image.onerror = () => { cleanup(); reject(new Error(`无法加载场景图片：${url}`)) }
+    image.onerror = () => { cleanup(); image.src = ''; reject(new Error(`无法加载场景图片：${url}`)) }
     signal.addEventListener('abort', abort, { once: true })
     image.src = url
   })
@@ -316,10 +316,15 @@ function captureCurrent(runtime: StageRuntime): WebGLTexture {
 
 async function createRuntime(canvas: HTMLCanvasElement, scene: StageKey, reduced: boolean, signal: AbortSignal): Promise<StageRuntime> {
   // Finish decoding before allocating GPU resources, so aborts cannot strand a context.
-  const [frame, maskImage, seedImage] = await Promise.all([
+  const decoded = await Promise.allSettled([
     loadImage(sources[scene], signal), loadImage(maskSource, signal), loadImage(seedPatchSource, signal),
   ])
+  const images = decoded.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
+  try {
+  const failure = decoded.find(result => result.status === 'rejected')
+  if (failure?.status === 'rejected') throw failure.reason
   if (signal.aborted) throw new DOMException('aborted', 'AbortError')
+  const [frame, maskImage, seedImage] = images
   const gl = canvas.getContext('webgl', {
     alpha: false, antialias: false, depth: false, stencil: false,
     premultipliedAlpha: false, preserveDrawingBuffer: false, powerPreference: 'low-power',
@@ -398,7 +403,6 @@ async function createRuntime(canvas: HTMLCanvasElement, scene: StageKey, reduced
   }
   canvas.dataset.seedPatchRgbBytes = String(seedPatches.atlasSize[0] * seedPatches.atlasSize[1] * 3)
   canvas.dataset.seedCount = String(seedPatches.origins.length)
-  seedImage.src = ''
   runtime.dispose = () => {
     runtime.loadController?.abort()
     cancelAnimationFrame(runtime.animation)
@@ -424,6 +428,10 @@ async function createRuntime(canvas: HTMLCanvasElement, scene: StageKey, reduced
   } catch (error) {
     gl.getExtension('WEBGL_lose_context')?.loseContext()
     throw error
+  }
+  } finally {
+    // Release decoded sources after upload, including partial failure and abort.
+    images.forEach(image => { image.src = '' })
   }
 }
 

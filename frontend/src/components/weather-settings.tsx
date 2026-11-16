@@ -7,27 +7,34 @@ import { useI18n } from '@/lib/i18n-context'
 import { previewRain, searchCities, useRainPreview, useWeatherStatus } from '@/lib/weather'
 import type { WeatherCity, WeatherPreference } from '@/lib/weather'
 
-export function WeatherSettings({ value, live, onChange }: {
-  value: WeatherPreference; live: boolean; onChange: (value: WeatherPreference) => void
+export type WeatherSearchDraft = { query: string; editing: boolean }
+
+export function WeatherSettings({ value, live, active = true, searchDraft, onSearchDraftChange, onChange }: {
+  value: WeatherPreference; live: boolean; active?: boolean; searchDraft?: WeatherSearchDraft; onSearchDraftChange?: (value: WeatherSearchDraft) => void; onChange: (value: WeatherPreference) => void
 }) {
   const { t, language, systemLanguage } = useI18n()
   const weather = useWeatherStatus()
   const previewing = useRainPreview()
-  const [editing, setEditing] = useState(false)
-  const [query, setQuery] = useState('')
+  const [localSearch, setLocalSearch] = useState<WeatherSearchDraft>({ query: '', editing: false })
+  const { editing, query } = searchDraft ?? localSearch
+  const changeSearch = onSearchDraftChange ?? setLocalSearch
   const [results, setResults] = useState<WeatherCity[]>([])
   const [searchState, setSearchState] = useState<'idle' | 'loading' | 'empty' | 'error'>('idle')
   const request = useRef<AbortController | null>(null)
   useEffect(() => () => request.current?.abort(), [])
   useEffect(() => {
-    if (!value.enabled) request.current?.abort()
-  }, [value.enabled])
+    if (!value.enabled || !active) request.current?.abort()
+  }, [value.enabled, active])
   async function search() {
     request.current?.abort()
     const controller = new AbortController()
     request.current = controller
     setSearchState('loading')
     setResults([])
+    const cancelled = () => {
+      if (request.current === controller) setSearchState('idle')
+    }
+    controller.signal.addEventListener('abort', cancelled, { once: true })
     try {
       const cities = await searchCities(query, language === 'system' ? systemLanguage : language, controller.signal)
       if (controller.signal.aborted) return
@@ -35,6 +42,9 @@ export function WeatherSettings({ value, live, onChange }: {
       setSearchState(cities.length ? 'idle' : 'empty')
     } catch {
       if (!controller.signal.aborted) setSearchState('error')
+    } finally {
+      controller.signal.removeEventListener('abort', cancelled)
+      if (request.current === controller) request.current = null
     }
   }
   const status = !live ? t('雨景需使用实时换光') : previewing ? t('正在预览雨景（30 秒）')
@@ -43,10 +53,10 @@ export function WeatherSettings({ value, live, onChange }: {
   return <div className="weather-settings">
     <div className="form-row"><label htmlFor="weather-enabled">{t('天气雨景')}</label><Switch id="weather-enabled" checked={value.enabled} onCheckedChange={enabled => onChange({ ...value, enabled })} /></div>
     {value.enabled && <>
-      <div className="form-row weather-city-row"><label>{t('天气城市')}</label><Button variant="outline" title={value.city ? `${value.city.name} · ${value.city.detail}` : undefined} onClick={() => { request.current?.abort(); setEditing(!editing); setQuery(''); setResults([]); setSearchState('idle') }}>{value.city?.name ?? t('选择城市')}</Button></div>
+      <div className="form-row weather-city-row"><label>{t('天气城市')}</label><Button variant="outline" title={value.city ? `${value.city.name} · ${value.city.detail}` : undefined} onClick={() => { request.current?.abort(); changeSearch({ editing: !editing, query: '' }); setResults([]); setSearchState('idle') }}>{value.city?.name ?? t('选择城市')}</Button></div>
       {editing && <div className="weather-city-search">
-        <div className="weather-search-input"><input aria-label={t('搜索城市')} placeholder={t('城市名称或拼音')} maxLength={80} value={query} onChange={event => { request.current?.abort(); setQuery(event.target.value); setResults([]); setSearchState('idle') }} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing && query.trim().length >= 2) { event.preventDefault(); void search() } }} /><Button variant="ghost" size="icon" aria-label={t('搜索城市')} disabled={query.trim().length < 2 || searchState === 'loading'} onClick={() => void search()}><Search /></Button></div>
-        {results.length > 0 && <Select aria-label={t('选择搜索结果')} value="choose" onValueChange={id => { const city = results.find(item => String(item.id) === id); if (city) { onChange({ ...value, city }); setEditing(false); setResults([]) } }} options={[{ value: 'choose', label: t('选择搜索结果'), disabled: true }, ...results.map(city => ({ value: String(city.id), label: `${city.name} · ${city.detail}` }))]} />}
+        <div className="weather-search-input"><input aria-label={t('搜索城市')} placeholder={t('城市名称或拼音')} maxLength={80} value={query} onChange={event => { request.current?.abort(); changeSearch({ editing, query: event.target.value }); setResults([]); setSearchState('idle') }} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing && query.trim().length >= 2) { event.preventDefault(); void search() } }} /><Button variant="ghost" size="icon" aria-label={t('搜索城市')} disabled={query.trim().length < 2 || searchState === 'loading'} onClick={() => void search()}><Search /></Button></div>
+        {results.length > 0 && <Select aria-label={t('选择搜索结果')} value="choose" onValueChange={id => { const city = results.find(item => String(item.id) === id); if (city) { onChange({ ...value, city }); changeSearch({ editing: false, query }); setResults([]) } }} options={[{ value: 'choose', label: t('选择搜索结果'), disabled: true }, ...results.map(city => ({ value: String(city.id), label: `${city.name} · ${city.detail}` }))]} />}
         {searchState !== 'idle' && <p role="status">{searchState === 'loading' ? t('正在搜索…') : searchState === 'empty' ? t('未找到城市，请尝试拼音或英文') : t('城市搜索失败，请重试')}</p>}
       </div>}
       <div className="weather-state-row"><span role="status">{status}</span><Button variant="ghost" size="icon" aria-label={previewing ? t('停止雨景预览') : t('预览雨景')} title={previewing ? t('停止雨景预览') : t('预览雨景')} aria-pressed={previewing} disabled={!live} onClick={previewRain}><CloudRain /></Button></div>

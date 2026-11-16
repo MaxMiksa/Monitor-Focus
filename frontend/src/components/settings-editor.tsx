@@ -1,6 +1,6 @@
 import { useI18n } from '@/lib/i18n-context'
 import type { Page, Language } from '@/lib/i18n'
-import { useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { Ref } from 'react'
 import { motion } from 'motion/react'
 import { pageLabels } from '@/lib/i18n'
@@ -10,9 +10,8 @@ import { useSettingsMorph } from '@/components/settings-morph-context'
 import { Plus, Trash2, RefreshCw, RotateCcw, Undo2, Redo2, Check, LoaderCircle, CircleAlert, Monitor, Laptop, Sun, Thermometer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { WeatherSettings } from '@/components/weather-settings'
 import { Select } from '@/components/ui/select'
-import { SkySettingsEditor } from '@/components/sky-settings'
+import type { WeatherSearchDraft } from '@/components/weather-settings'
 import { previewSky } from '@/lib/sky-preference'
 import type { StageKey } from '@/components/scene-panel'
 import { SortableList } from '@/components/sortable-list'
@@ -21,12 +20,18 @@ import type { Send } from '@/App'
 import { captureBehavior } from '@/lib/control'
 import type { Display, EdgeWheelModifier, Settings, Snapshot } from '@/lib/control'
 
+const WeatherSettings = lazy(() => import('./weather-settings').then(module => ({ default: module.WeatherSettings })))
+const SkySettingsEditor = lazy(() => import('./sky-settings').then(module => ({ default: module.SkySettingsEditor })))
+
 export type SettingsEditorHandle = { flush: () => Promise<boolean> }
 const tabs = ['displays', 'scenes', 'schedule', 'focus', 'general'] as const
 export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boolean; close: () => void; snapshot: Snapshot; send: Send; ref: Ref<SettingsEditorHandle> }) {
-  const { settingsOpacity, clipPath } = useSettingsMorph()
+  const { progress, settingsOpacity, clipPath } = useSettingsMorph()
   const { t, sceneName, setLanguage, displayName, message: translateMessage } = useI18n()
   const [page, setPage] = useState<Page>('displays')
+  const [collapsed, setCollapsed] = useState(!open)
+  useEffect(() => progress.on('change', value => setCollapsed(value <= .0001)), [progress])
+  const contentMounted = open || !collapsed
   const [skyOpen, setSkyOpen] = useState(false)
   const [skyScene, setSkyScene] = useState<StageKey>('night')
   const editingSky = page === 'general' && skyOpen
@@ -35,6 +40,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
     return () => previewSky(null)
   }, [open, editingSky, skyScene])
   const navigation = useRef<HTMLElement>(null)
+  const [weatherSearch, setWeatherSearch] = useState<WeatherSearchDraft>({ query: '', editing: false })
   const { draft, change, undo, redo, reload, flush, saving, status, hasFailure, canUndo, canRedo } = useSettingsHistory(snapshot, send)
   const { stage: stageStyle, bar: barStyle } = draft.appearance
   const mixedTransition = draft.ScheduleTransitionMinutes == null && new Set(draft.Schedule.map(point => point.TransitionMinutes)).size > 1
@@ -66,7 +72,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
   const deviceSend: Send = async command => await flush() ? send(command) : null
   return <motion.section className="settings-float" aria-label={t('设置')} aria-hidden={!open} inert={!open}
     style={{ opacity: settingsOpacity, clipPath, pointerEvents: open ? 'auto' : 'none' }}>
-    <div className={`settings-content settings-page-${page}${editingSky ? ' settings-editing-sky' : ''}`} key={page}>
+    <Suspense fallback={null}>{contentMounted && <div className={`settings-content settings-page-${page}${editingSky ? ' settings-editing-sky' : ''}`} key={page}>
     {editingSky && <SkySettingsEditor scene={skyScene} selectScene={setSkyScene} value={draft.appearance.sky} change={update => change(s => update(s.appearance.sky[skyScene]))} back={() => setSkyOpen(false)} />}
     {page === 'displays' && <>
       <div className="device-brightness">{snapshot.Displays.map(display => <CurrentDisplay key={display.Id} display={display} send={deviceSend} />)}</div>
@@ -111,10 +117,10 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
       <div className="form-row"><label htmlFor="edge-brightness">{t('顶部滚轮调节亮度')}</label><Switch id="edge-brightness" checked={draft.TopEdgeBrightnessEnabled ?? false} onCheckedChange={on => change(s => { s.TopEdgeBrightnessEnabled = on })} /></div>
       <div className="form-row"><label htmlFor="edge-volume">{t('底部滚轮调节音量')}</label><Switch id="edge-volume" checked={draft.BottomEdgeVolumeEnabled ?? false} onCheckedChange={on => change(s => { s.BottomEdgeVolumeEnabled = on })} /></div>
       <div className="form-row"><label htmlFor="edge-modifier">{t('色温／应用音量按键')}</label><Select id="edge-modifier" value={draft.EdgeWheelModifier ?? 'alt'} onValueChange={value => change(s => { s.EdgeWheelModifier = value as EdgeWheelModifier })} options={[{ value: 'alt', label: 'Alt' }, { value: 'ctrl', label: 'Ctrl' }, { value: 'shift', label: 'Shift' }]} /></div>
-      <WeatherSettings value={draft.appearance.weather} live={stageStyle === 'live'} onChange={weather => change(s => { s.appearance.weather = weather; if (weather.enabled) s.appearance.stage = 'live' })} />
+      <WeatherSettings active={open} searchDraft={weatherSearch} onSearchDraftChange={setWeatherSearch} value={draft.appearance.weather} live={stageStyle === 'live'} onChange={weather => change(s => { s.appearance.weather = weather; if (weather.enabled) s.appearance.stage = 'live' })} />
       </div>
     </>}
-    </div>
+    </div>}</Suspense>
     <footer className="settings-bottom">
       <div className="settings-bottom-status">
         <Button variant="ghost" size="icon" aria-label={t('重新检测显示器')} title={t('重新检测显示器')} onClick={() => void deviceSend({ Action: 'rescan' })}><RefreshCw /></Button>
