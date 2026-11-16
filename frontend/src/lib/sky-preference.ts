@@ -2,7 +2,7 @@ import type { StageKey } from '@/components/scene-panel'
 
 export type SkySettings = {
   stars: { enabled: boolean; style: 'sparse' | 'dense'; count: number; brightness: number; twinkle: number }
-  clouds: { enabled: boolean; style: 'legacy' | 'wisps' | 'puffs' | 'layers'; layout: CloudLayout; density: number; speed: number }
+  clouds: { enabled: boolean; style: 'legacy' | 'wisps' | 'puffs' | 'layers'; layout: CloudLayout; motion: 'drift' | 'float'; density: number; speed: number }
 }
 export const cloudLayouts = ['original', 'scatter', 'stagger', 'arc', 'depth'] as const
 export type CloudLayout = typeof cloudLayouts[number]
@@ -31,6 +31,7 @@ export function readSkyPreferences(): SkyPreferences {
         enabled: typeof value?.clouds?.enabled === 'boolean' ? value.clouds.enabled : scene !== 'night',
         style: value?.clouds?.style === 'legacy' || value?.clouds?.style === 'puffs' || value?.clouds?.style === 'layers' ? value.clouds.style : 'wisps',
         layout: cloudLayouts.includes(value?.clouds?.layout as CloudLayout) ? value!.clouds!.layout : 'original',
+        motion: value?.clouds?.motion === 'float' ? 'float' : 'drift',
         density: percent(value?.clouds?.density, 35), speed: percent(value?.clouds?.speed, 20),
       },
     }]

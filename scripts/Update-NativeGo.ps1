@@ -12,6 +12,7 @@ $oldPath=$owners[0].ExecutablePath
 if($oldPath -eq $Executable -and -not $Restart){throw 'Use a new immutable package path or explicit -Restart'}
 $before=Send-Go
 if($before.Displays.Count -lt 1 -or @($before.Displays|Where-Object Error).Count){throw 'Hardware state needs attention'}
+$wasScheduled=$before.Settings.ScheduleEnabled -and ([string]$before.Source).StartsWith('时间计划')
 $before|ConvertTo-Json -Depth 40|Set-Content "$evidence/$EvidencePrefix-before.json"
 $oldProcess=Get-Process -Id $owners[0].ProcessId
 $wasOpen=$oldProcess.MainWindowHandle -ne 0
@@ -19,6 +20,9 @@ $newProcess=$null;$updated=$false;$exited=$false
 function Restore-Latest {
     $s=Send-Go
     if($s.FocusPaused -ne $before.FocusPaused){$s=Send-Go @{Action='pause'}}
+    # A running transition has non-rounded targets. Let the plan continue instead
+    # of rounding its temperature through manual controls and putting it on hold.
+    if($wasScheduled){$null=Send-Go @{Action='resume-plan'};return}
     $source=$before.Settings.BrightnessLinkCalibration.SourceId
     $displays=if($before.Settings.Linked -and $source){@($before.Displays|Where-Object Id -eq $source)}else{@($before.Displays)}
     foreach($d in $displays){$null=Send-Go @{Action='brightness';Id=$d.Id;Value=$d.Brightness}}
@@ -36,13 +40,14 @@ try {
     $newProcess=Start-Process $Executable -ArgumentList '--mode native --hardware --production --background' -PassThru -WindowStyle Hidden
     Wait-Hardware;Restore-Latest
     $now=Send-Go
-    $matches=$true;foreach($d in $before.Displays){$n=$now.Displays|Where-Object Id -eq $d.Id;if($n.Brightness -ne $d.Brightness -or $n.Kelvin -ne $d.Kelvin -or $n.Error){$matches=$false}}
+    $matches=$true;foreach($d in $before.Displays){$n=@($now.Displays|Where-Object Id -eq $d.Id);if($n.Count -ne 1 -or $n[0].Error -or (-not $wasScheduled -and ($n[0].Brightness -ne $d.Brightness -or $n[0].Kelvin -ne $d.Kelvin))){$matches=$false}}
+    if($wasScheduled -and ((-not ([string]$now.Source).StartsWith('时间计划')) -or $now.Settings.Revision -ne $before.Settings.Revision)){$matches=$false}
     $startup=(Get-ItemProperty 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Run' -Name MonitorsFocus).MonitorsFocus
     $expected='"'+$Executable+'" --mode native --hardware --production --background'
-    if(-not $matches -or $now.FocusPaused -ne $before.FocusPaused -or $now.Warning -or $startup -ne $expected){throw 'Updated core final state mismatch'}
+    if(-not $matches -or $now.FocusPaused -ne $before.FocusPaused -or $now.Error -or $now.Warning -or $startup -ne $expected){throw 'Updated core final state mismatch'}
     if($wasOpen){$null=Send-Go @{Action='host-open'}}
     $updated=$true
-    @{At=(Get-Date).ToString('o');Updated=$true;Executable=$Executable;PreviousExecutable=$oldPath;Pid=$newProcess.Id;TargetsPreserved=$matches;FocusPreserved=$true;Startup=$startup;Error=$now.Error;Warning=$now.Warning}|ConvertTo-Json|Set-Content "$evidence/$EvidencePrefix-update.json"
+    @{At=(Get-Date).ToString('o');Updated=$true;Executable=$Executable;PreviousExecutable=$oldPath;Pid=$newProcess.Id;TargetsPreserved=($matches -and -not $wasScheduled);PlanResumed=[bool]$wasScheduled;FocusPreserved=$true;Startup=$startup;Error=$now.Error;Warning=$now.Warning}|ConvertTo-Json|Set-Content "$evidence/$EvidencePrefix-update.json"
 }finally {
     if(-not $updated -and $exited){
         if($newProcess){$newProcess.Refresh();if(-not $newProcess.HasExited){$null=Send-Go @{Action='host-exit'};if(-not $newProcess.WaitForExit(20000)){throw 'Cannot drain new core; refused concurrent rollback'}}}

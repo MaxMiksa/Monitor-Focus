@@ -2,6 +2,10 @@
 
 ## 工程与环境
 
+云彩运动：`sky-preference.ts` 增加每场景 `clouds.motion`，`drift`／`float`，旧数据仅补默认 drift，不清浓度／速度／分布。`cloud-motion.ts` 复用已按速度累计的时钟；随风正向平移，按透视视口半宽＋14 世界单位在完整离屏后循环，轻浮使用不同相位的有界往返。`sky-canvas.tsx` 复用三组／72 粒子、纹理和原有 20 fps 时钟；旧版薄云仅加采样位移，地平线遮罩不移动。无新画布、依赖或硬件动作，0 速／隐藏／初始减少动态效果沿用停帧，停用释放。浏览器四样式、模式／场景记忆／重开／撤销重做、中英最小窗口、0速绘制计数为0及恢复后1.1秒约20次、关闭卸载和初始减少动态效果检查通过；系统减少动态效果运行中切换不会立即停帧，仍需重开窗口，不宣称已修复。数学边界／方向／往返／旧数据兼容检查通过，截图／摘要与正式构建日志在 `build/diagnostics/cloud-motion/`。部署证据 `cloud-motion-20261116-update.json`／`-retention.json`，包 `20261116-175052-276`；时间计划继续，Revision／专注／唯一自启保留、Error／Warning 为空。Go 沿用已提交 overlay 隔离在途原生修改，未重复原生截图或长期资源验收。
+
+部署恢复区分时间计划与手动目标：`Update-NativeGo.ps1` 对原「时间计划」来源使用 resume-plan，核对设备身份、Revision、计划来源、专注／错误及唯一自启，不经手动色温取整或进入手动保持；该分支记录 `PlanResumed=true`，不声称瞬时数值完全不变。手动来源仍逐值恢复并核对。计划路径本轮实际部署通过；回退复用相同恢复逻辑。
+
 点击外部收起：`App.tsx` 只在设置或天气展开时注册 document capture `pointerdown`，沿 composedPath 检查 `data-dismiss-region`；设置根节点、Select Portal 与时间点 Popover 同属 settings，天气根节点属 weather。不拦截／阻止原事件，不监听 pointerup，内部开始的滑条拖动越界不收起；关闭清理监听，沿用设置历史与按需卸载。浏览器验证内部／外部、下拉及嵌套时间点弹层、编辑后重开／撤销、跨界拖动、天气转设置；无浏览器错误。`outside-dismiss-build.log` 记录正式构建／lint、Go test／vet 与 PE 检查，Go 沿用已提交原生 overlay，不夹带工作区显示／恢复／原型页改动。部署 `20261116-172849-082`、唯一自启／专注和五包保留见 `outside-dismiss-20261116-retry-*`；首次部署因渐变中的 5059 K 经手动恢复取整至 5100 K 校验失败并自动回退，重试成功后执行已有 resume-plan 恢复原时间计划，见 `outside-dismiss-resumed-plan.json`。不能把该过程宣称为计划瞬时目标逐值不变；未测本轮原生画面、跨应用外部点击或长期资源。
 
 国内天气：`weather-domestic.ts` 适配固定 `https://uapis.cn/api/v1/misc/weather`，无需账号／密钥，中文地区名和原偏好行政层级必须匹配响应；缺字段／未知天气／过期／跨日预报不接受并自动按原坐标回退 Open-Meteo。当前雨景与未来三小时建议独立；缺少阵风读数保留 `null`，不拿普通风速冒充阵风。缓存使用带来源的 `weather-current-v2`，旧天气缓存不再读取，其他偏好与共享缓存不清空。设置原来源链接随实际来源切换并标注备用。`node --experimental-vm-modules scripts/Test-WeatherSource.mjs` 验证当前多云／未来雨的隔离、实雨、地区／日期／时效／未知值拒绝、缺失建议、首选／回退和取消；加 `--live` 读取真实南山天气。`build/diagnostics/weather-domestic/` 保存真实响应与验证、正式构建日志；生产 Origin 的跨域响应许可已核对，真实适配结果为多云／28°C／雨景 0。正式构建／lint、Go test／vet／PE 检查通过；部署见 `weather-domestic-20261116-update.json`，保持目标、专注与唯一自启。未证明长期稳定或所有地区覆盖，未重复原生截图；构建沿用 `weather-location/native-source/source-overlay.json` 隔离其他在途原生修改。

@@ -1,4 +1,4 @@
-import { Color, DataTexture, LinearFilter, RedFormat, RepeatWrapping, ShaderMaterial } from 'three'
+import { Color, DataTexture, LinearFilter, RedFormat, RepeatWrapping, ShaderMaterial, Vector2 } from 'three'
 
 // Restored from the pre-particle stage (6fe1bc6). Keep its four-octave noise
 // and three warped veil layers; make density affect contrast as well as alpha.
@@ -24,10 +24,10 @@ export function createLegacyMaterial() {
   noise.minFilter=noise.magFilter=LinearFilter
   noise.needsUpdate=true
   const material=new ShaderMaterial({ transparent:true, depthWrite:false, depthTest:false, toneMapped:false,
-    uniforms:{ airNoise:{value:noise},phase:{value:0},density:{value:.65},tint:{value:new Color('#ffffff')} },
+    uniforms:{ airNoise:{value:noise},phase:{value:0},movement:{value:new Vector2()},density:{value:.65},tint:{value:new Color('#ffffff')} },
     vertexShader:`varying vec2 vUv; void main(){ vUv=vec2(position.x*.5+.5,.5-position.y*.5); gl_Position=vec4(position.xy,0.,1.); }`,
     fragmentShader:`
-      uniform sampler2D airNoise; uniform float phase,density; uniform vec3 tint; varying vec2 vUv;
+      uniform sampler2D airNoise; uniform float phase,density; uniform vec2 movement; uniform vec3 tint; varying vec2 vUv;
       float veilLayer(vec2 p,float seed,float harmonic){
         float a=phase*harmonic+seed;
         vec2 orbit=vec2(sin(a),cos(a+seed*.31))*.035;
@@ -43,9 +43,10 @@ export function createLegacyMaterial() {
         return veil*transmittance*dissolve;
       }
       void main(){
-        vec2 p1=vec2(vUv.x*1.42+vUv.y*.31,vUv.y*5.8-vUv.x*.18)+vec2(.12,.27);
-        vec2 p2=mat2(.93,-.36,.36,.93)*vec2(vUv.x*2.15-vUv.y*.44,vUv.y*8.+vUv.x*.26)+vec2(.47,.13);
-        vec2 p3=mat2(.80,.60,-.60,.80)*vec2(vUv.x*2.85+vUv.y*.55,vUv.y*10.6-vUv.x*.33)+vec2(.71,.63);
+        vec2 uv=vUv-movement;
+        vec2 p1=vec2(uv.x*1.42+uv.y*.31,uv.y*5.8-uv.x*.18)+vec2(.12,.27);
+        vec2 p2=mat2(.93,-.36,.36,.93)*vec2(uv.x*2.15-uv.y*.44,uv.y*8.+uv.x*.26)+vec2(.47,.13);
+        vec2 p3=mat2(.80,.60,-.60,.80)*vec2(uv.x*2.85+uv.y*.55,uv.y*10.6-uv.x*.33)+vec2(.71,.63);
         float wisps=veilLayer(p1,.7,1.)*.46+veilLayer(p2,2.4,2.)*.33+veilLayer(p3,4.1,3.)*.21;
         // Old density was attenuated by luma, daytime and multiple calm masks;
         // its tint also blended toward the existing sky. Avoid multiplying all

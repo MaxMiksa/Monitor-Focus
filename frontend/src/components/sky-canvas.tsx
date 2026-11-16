@@ -6,6 +6,7 @@ import type { StageKey } from '@/components/scene-panel'
 import type { SkySettings } from '@/lib/sky-preference'
 import { createLegacyMaterial } from '@/lib/cloud-legacy'
 import { cloudPlacements } from '@/lib/cloud-placement'
+import { cloudPosition, legacyCloudOffset } from '@/lib/cloud-motion'
 import { independentStarTwinkle } from '@/lib/star-twinkle'
 
 const colors = { morning: '#fff1dc', midday: '#eef8ff', dusk: '#ffbb9a', night: '#7583b0' }
@@ -159,17 +160,25 @@ export function SkyCanvas({ scene, reduced, settings }: { scene: StageKey; reduc
       canvas.dataset.starStyle = s.style
       canvas.dataset.cloudStyle = c.style
       canvas.dataset.cloudLayout = c.style === 'legacy' ? 'legacy' : c.layout
+      canvas.dataset.cloudMotion = c.motion
       canvas.dataset.starCount = String(stars?.count ?? 0)
       canvas.dataset.cloudResource = legacy ? 'legacy' : particles ? 'particles' : 'none'
     }
 
     const render = () => {
       stars?.object.update(starTime)
-      if (legacy) legacy.resources.material.uniforms.phase.value = cloudTime * .19
+      const motion = activeSettings.clouds.motion
+      if (legacy) {
+        legacy.resources.material.uniforms.phase.value = cloudTime * .19
+        const offset = legacyCloudOffset(cloudTime, motion)
+        legacy.resources.material.uniforms.movement.value.set(offset.x, offset.y)
+      }
       particles?.groups.forEach((cloud, index) => {
         const position = placements[index]
-        cloud.position.x = position.x + Math.sin(cloudTime * .09 + position.phase) * position.amplitude
-        cloud.position.y = position.y + Math.sin(cloudTime * .07 + position.phase) * position.vertical
+        const halfWidth = Math.tan(camera.fov * Math.PI / 360) * (camera.position.z - position.z) * camera.aspect
+        const next = cloudPosition(position, cloudTime, motion, halfWidth)
+        cloud.position.x = next.x
+        cloud.position.y = next.y
       })
       world.updateMatrixWorld(true)
       particles?.object.update(camera, cloudTime, 0)
