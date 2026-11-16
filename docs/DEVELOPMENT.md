@@ -2,6 +2,8 @@
 
 ## 工程与环境
 
+天气位置：`frontend/src/lib/weather.ts` 保持原 `WeatherCity` 本地存储结构，搜索结果补全所属城市和层级；无匹配时对中文区县后缀及组合名做有界回退，组合名必须匹配返回行政层级，仍须用户显式选择。缓存键含地点 ID 与经纬度，换区县不复用全市天气；不改天气轮询、桥权限或硬件配置。`build/diagnostics/weather-location/` 保存实时地名响应、六种查询与取消／旧偏好兼容检查、正式前端真实地名搜索／坐标切换／撤销／重做／重载验收和构建日志；天气响应为测试专用晴天，不代表南山实况。正式构建用同目录 `native-source/source-overlay.json` 隔离其他未提交原生改动，未包含原型页；部署见 `build/diagnostics/weather-location-20261116-update.json`。
+
 单一 Go 工程：根目录 `*.go`、`go.mod`、`go.sum` 是 Wails 宿主；`internal/` 是原生适配与纯规则；`frontend/` 是 React/TypeScript 界面；`scripts/` 是构建、开发、部署与诊断入口；`calibrations/` 保存个人设备匹配数据；`build/` 只放可重建产物和诊断记录，不是源码。
 
 ```text

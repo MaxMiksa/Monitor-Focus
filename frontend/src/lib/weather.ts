@@ -74,16 +74,48 @@ async function readJSON(url: URL, parent: AbortSignal): Promise<unknown> {
   }
 }
 
+type Place = WeatherCity & { admin1?: string; admin2?: string; admin3?: string; admin4?: string; country?: string }
+const regionName = (name: string) => name.replace(/(特别行政区|自治区|省|市|区|县|街道|镇|乡)$/u, '')
+function parents(place: Place) {
+  return [place.admin4, place.admin3, place.admin2, place.admin1, place.country]
+    .filter((part): part is string => typeof part === 'string' && !!part)
+}
+function weatherPlace(place: Place): WeatherCity {
+  const hierarchy = [...new Set(parents(place))].filter(part => regionName(part) !== regionName(place.name))
+  const parent = [place.admin3, place.admin2].find(part => part && regionName(part) !== regionName(place.name))
+  return {
+    id: place.id, name: parent ? `${parent} · ${place.name}` : place.name,
+    detail: hierarchy.filter(part => part !== parent).join(' · '), latitude: place.latitude, longitude: place.longitude,
+  }
+}
+async function findPlaces(name: string, language: string, signal: AbortSignal): Promise<Place[]> {
+  const url = new URL('https://geocoding-api.open-meteo.com/v1/search')
+  url.search = new URLSearchParams({ name, count: '20', language: language.startsWith('zh') ? 'zh' : 'en', format: 'json' }).toString()
+  const data = await readJSON(url, signal) as { results?: Place[] }
+  if (!data || (data.results != null && !Array.isArray(data.results))) throw new Error('Invalid places')
+  return (data.results ?? []).slice(0, 20).filter(place => place && validCity({ ...place, detail: '' }))
+}
 export async function searchCities(query: string, language: string, signal: AbortSignal): Promise<WeatherCity[]> {
   const name = query.trim().slice(0, 80)
   if (name.length < 2) return []
-  const url = new URL('https://geocoding-api.open-meteo.com/v1/search')
-  url.search = new URLSearchParams({ name, count: '5', language: language.startsWith('zh') ? 'zh' : 'en', format: 'json' }).toString()
-  const data = await readJSON(url, signal) as { results?: { id: number; name: string; admin1?: string; country?: string; latitude: number; longitude: number }[] }
-  if (!data || (data.results != null && !Array.isArray(data.results))) throw new Error('Invalid cities')
-  return (data.results ?? []).slice(0, 5).map(city => ({
-    id: city.id, name: city.name, detail: [city.admin1, city.country].filter(Boolean).join(' · '), latitude: city.latitude, longitude: city.longitude,
-  })).filter(validCity)
+  let places = await findPlaces(name, language, signal)
+  // GeoNames often indexes 南山 rather than 南山区; compound searches must
+  // match the returned parent hierarchy, never silently choose another city.
+  const compact = name.replace(/[\s·/，,]+/gu, '')
+  if (!places.length && /^\p{Script=Han}+$/u.test(compact)) {
+    const locality = compact.replace(/(街道|地区|区|县|镇|乡)$/u, '')
+    const searches = locality !== name && locality.length >= 2 ? [{ name: locality, parent: '' }] : []
+    for (const length of [2, 3, 4]) {
+      if (locality.length - length >= 2) searches.push({ name: locality.slice(-length), parent: locality.slice(0, -length) })
+    }
+    const fallback = await Promise.all(searches.map(async search => {
+      const found = await findPlaces(search.name, language, signal)
+      const parent = search.parent.split(/[省市]/u).map(regionName).join('')
+      return parent ? found.filter(place => parents(place).reverse().map(regionName).join('').includes(parent)) : found
+    }))
+    places = fallback.flat()
+  }
+  return [...new Map(places.map(place => [place.id, weatherPlace(place)])).values()].filter(validCity).slice(0, 10)
 }
 
 function cityKey(city: WeatherCity) { return `${city.id}:${city.latitude}:${city.longitude}` }
