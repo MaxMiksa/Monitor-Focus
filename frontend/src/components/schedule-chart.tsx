@@ -127,7 +127,7 @@ export function ScheduleChart({ settings, snapshot, onChange, active }: {
       <div className="schedule-time-axis" aria-hidden="true">{[0, 6, 12, 18, 24].map(h => <span key={h} style={{ left: `${h / 24 * 100}%`, transform: `translateX(${h === 0 ? 0 : h === 24 ? -100 : -50}%)` }}>{String(h).padStart(2, '0')}:00</span>)}</div>
       {(error || !validSchedule(settings.Schedule)) && !editor && <p className="schedule-feedback" role="status">{t('时间点重复或渐变重叠，请调整时间或缩短渐变时长。')}</p>}
     </div>
-    {editor && <Popover.Portal><Popover.Content className="schedule-popover glass-select-content" side="right" align="center" sideOffset={18} collisionPadding={20}
+    {editor && <Popover.Portal><Popover.Content data-dismiss-region="settings" className="schedule-popover glass-select-content" side="right" align="center" sideOffset={18} collisionPadding={20}
       aria-label={t(editor.key ? '编辑时间点' : '添加时间点')} onEscapeKeyDown={event => { event.stopPropagation() }} onCloseAutoFocus={event => { event.preventDefault(); addButton.current?.focus({ preventScroll: true }) }}
       onKeyDown={event => event.stopPropagation()}>
       <div className="schedule-popover-heading"><span>{t(editor.key ? '编辑时间点' : '添加时间点')}</span><Popover.Close asChild><Button size="icon" variant="ghost" aria-label={t('关闭')}><X /></Button></Popover.Close></div>

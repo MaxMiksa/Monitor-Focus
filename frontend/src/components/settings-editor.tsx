@@ -71,7 +71,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
     return () => window.removeEventListener('keydown', onKey)
   }, [open, page, close])
   const deviceSend: Send = async command => await flush() ? send(command) : null
-  return <motion.section className="settings-float" aria-label={t('设置')} aria-hidden={!open} inert={!open}
+  return <motion.section className="settings-float" data-dismiss-region="settings" aria-label={t('设置')} aria-hidden={!open} inert={!open}
     style={{ opacity: settingsOpacity, clipPath, pointerEvents: open ? 'auto' : 'none' }}>
     <Suspense fallback={null}>{contentMounted && <div className={`settings-content settings-page-${page}${editingSky ? ' settings-editing-sky' : ''}`} key={page}>
     {editingSky && <SkySettingsEditor scene={skyScene} selectScene={setSkyScene} value={draft.appearance.sky} change={update => change(s => update(s.appearance.sky[skyScene]))} back={() => setSkyOpen(false)} />}

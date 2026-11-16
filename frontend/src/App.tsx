@@ -36,6 +36,18 @@ export default function App() {
   const [error, setError] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [weatherOpen, setWeatherOpen] = useState(false)
+  useEffect(() => {
+    if (!settingsOpen && !weatherOpen) return
+    const region = settingsOpen ? 'settings' : 'weather'
+    function onPointerDown(event: PointerEvent) {
+      // Portalled controls belong to their panel, even outside its rectangle.
+      if (event.composedPath().some(node => node instanceof Element && node.getAttribute('data-dismiss-region') === region)) return
+      if (region === 'settings') setSettingsOpen(false)
+      else setWeatherOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [settingsOpen, weatherOpen])
   const editor = useRef<SettingsEditorHandle>(null)
   const queue = useRef(Promise.resolve())
   const busy = useRef(0)

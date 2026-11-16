@@ -19,7 +19,7 @@ export function Select({ id, value, onValueChange, options, disabled, 'aria-labe
       <SelectPrimitive.Icon asChild><ChevronDown aria-hidden="true" /></SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
     <SelectPrimitive.Portal>
-      <SelectPrimitive.Content data-slot="select-content" className="glass-select-content" position="popper" sideOffset={8} align="end" collisionPadding={12} onEscapeKeyDown={event => { event.preventDefault(); event.stopPropagation(); setOpen(false) }}>
+      <SelectPrimitive.Content data-dismiss-region="settings" data-slot="select-content" className="glass-select-content" position="popper" sideOffset={8} align="end" collisionPadding={12} onEscapeKeyDown={event => { event.preventDefault(); event.stopPropagation(); setOpen(false) }}>
         <SelectPrimitive.ScrollUpButton className="glass-select-scroll"><ChevronUp aria-hidden="true" /></SelectPrimitive.ScrollUpButton>
         <SelectPrimitive.Viewport>
           {options.map(option => <SelectPrimitive.Item key={option.value} value={option.value} disabled={option.disabled} className="glass-select-option">

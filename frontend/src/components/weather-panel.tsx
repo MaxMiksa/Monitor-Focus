@@ -28,7 +28,7 @@ export function WeatherPanel({ city, weather, reduced, chooseLocation }: { city:
   const details = weather.status !== 'error' ? weather.details : null
   const status = !city ? t('未选择地区') : weather.status === 'error' ? t('天气获取失败，稍后重试')
     : weather.status === 'loading' || weather.status === 'off' ? t('正在获取天气…') : t('天气详情暂不可用')
-  return <motion.aside className="weather-panel" aria-label={t('天气概览')} aria-hidden={!present} inert={!present}
+  return <motion.aside className="weather-panel" data-dismiss-region="weather" aria-label={t('天气概览')} aria-hidden={!present} inert={!present}
     initial={{ y: reduced ? 0 : '-125%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: reduced ? 0 : '-125%', opacity: 0 }}
     transition={{ duration: reduced ? 0 : .32, ease: [.2, .8, .2, 1] }}>
     <div className="weather-panel-content" aria-live="polite">
