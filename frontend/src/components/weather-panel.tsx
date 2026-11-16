@@ -34,20 +34,20 @@ export function WeatherPanel({ city, weather, reduced, chooseLocation }: { city:
     <div className="weather-panel-content" aria-live="polite">
       {details ? <>
         <div className="weather-panel-current">
+          <div className="weather-panel-reading">
           <WeatherIcon code={details.code} isDay={details.isDay} label={t(weatherLabel(details.code))} />
           <span className="weather-panel-temperature" aria-label={t('当前气温')}>{Math.round(details.temperature)}°C</span>
+          </div>
+          <div className="weather-panel-summary">
           <span>{t(weatherLabel(details.code))}</span>
           <span className="weather-panel-range">{t('今日 {0}–{1}°C', Math.round(details.minimum), Math.round(details.maximum))}</span>
+          </div>
         </div>
         <div className="weather-panel-advice">
           <p aria-label={t('穿衣建议')}><Shirt aria-hidden="true" /><span>{t(clothingAdvice(details))}</span></p>
           <p aria-label={t('出行建议')}><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="19" cy="4" r="2.2" /><path d="m9 13 6-4 6 2 4 5m-10-7-3 11-5 9m5-9 7 3 3 6m-6-17-2 7" /></svg><span>{t(travelAdvice(details))}</span></p>
         </div>
-      </> : <p className="weather-panel-status" role="status">{status}</p>}
-    </div>
-    <div className="weather-panel-location">
-      <Button variant="ghost" title={city ? `${city.name} · ${city.detail}` : t('选择位置')} onClick={chooseLocation}>{city?.name ?? t('选择位置')}</Button>
-      {city?.detail && <span>{city.detail}</span>}
+      </> : <div className="weather-panel-status" role="status"><p>{status}</p>{!city && <Button variant="ghost" onClick={chooseLocation}>{t('选择位置')}</Button>}</div>}
     </div>
   </motion.aside>
 }
