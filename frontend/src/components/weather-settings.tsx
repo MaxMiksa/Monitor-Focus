@@ -9,8 +9,8 @@ import type { WeatherCity, WeatherPreference } from '@/lib/weather'
 
 export type WeatherSearchDraft = { query: string; editing: boolean }
 
-export function WeatherSettings({ value, live, active = true, searchDraft, onSearchDraftChange, onChange }: {
-  value: WeatherPreference; live: boolean; active?: boolean; searchDraft?: WeatherSearchDraft; onSearchDraftChange?: (value: WeatherSearchDraft) => void; onChange: (value: WeatherPreference) => void
+export function WeatherSettings({ value, active = true, searchDraft, onSearchDraftChange, onChange }: {
+  value: WeatherPreference; active?: boolean; searchDraft?: WeatherSearchDraft; onSearchDraftChange?: (value: WeatherSearchDraft) => void; onChange: (value: WeatherPreference) => void
 }) {
   const { t, language, systemLanguage } = useI18n()
   const weather = useWeatherStatus()
@@ -47,7 +47,7 @@ export function WeatherSettings({ value, live, active = true, searchDraft, onSea
       if (request.current === controller) request.current = null
     }
   }
-  const status = !live ? t('雨景需使用实时换光') : previewing ? t('正在预览雨景（30 秒）')
+  const status = previewing ? t('正在预览雨景（30 秒）')
     : weather.status === 'loading' ? t('正在获取天气…') : weather.status === 'error' ? t('天气获取失败，稍后重试')
       : weather.status === 'rain' ? t('当前有雨') : weather.status === 'dry' ? t('当前无雨') : t('选择位置后跟随天气')
   return <div className="weather-settings">
@@ -58,7 +58,7 @@ export function WeatherSettings({ value, live, active = true, searchDraft, onSea
         {results.length > 0 && <Select aria-label={t('选择搜索结果')} value="choose" onValueChange={id => { const city = results.find(item => String(item.id) === id); if (city) { onChange({ ...value, city }); changeSearch({ editing: false, query }); setResults([]) } }} options={[{ value: 'choose', label: t('选择搜索结果'), disabled: true }, ...results.map(city => ({ value: String(city.id), label: `${city.name} · ${city.detail}` }))]} />}
         {searchState !== 'idle' && <p role="status">{searchState === 'loading' ? t('正在搜索…') : searchState === 'empty' ? t('未找到地点，请尝试区县名、拼音或英文') : t('地点搜索失败，请重试')}</p>}
       </div>}
-      {value.enabled && <div className="weather-state-row"><span role="status">{status}</span><Button variant="ghost" size="icon" aria-label={previewing ? t('停止雨景预览') : t('预览雨景')} title={previewing ? t('停止雨景预览') : t('预览雨景')} aria-pressed={previewing} disabled={!live} onClick={previewRain}><CloudRain /></Button></div>}
+      {value.enabled && <div className="weather-state-row"><span role="status">{status}</span><Button variant="ghost" size="icon" aria-label={previewing ? t('停止雨景预览') : t('预览雨景')} title={previewing ? t('停止雨景预览') : t('预览雨景')} aria-pressed={previewing} onClick={previewRain}><CloudRain /></Button></div>}
       <a className="weather-source" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">{t('天气数据：Open-Meteo')}</a>
   </div>
 }

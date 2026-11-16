@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { Sunrise, Sun, Sunset, Moon, Settings2, SlidersHorizontal, Monitor, Laptop, Link2, Unlink2, Pause, Play, RotateCcw, RefreshCw, Thermometer, X, AlertCircle, ChevronUp } from 'lucide-react'
+import { Sunrise, Sun, Sunset, Moon, Link2, Unlink2, Pause, Play, RotateCcw, AlertCircle, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Slider } from '@/components/ui/slider'
 import { useI18n } from '@/lib/i18n-context'
 import { useSceneBarStyle, useStageStyle } from '@/lib/stage-preference'
 import { LiveSceneStage } from '@/components/live-scene-stage'
@@ -23,7 +22,6 @@ export type StageKey = SceneKey
 const sceneKeys = ['morning', 'midday', 'dusk', 'night'] as const
 const sceneIcons = { morning: Sunrise, midday: Sun, dusk: Sunset, night: Moon }
 const sceneNames = { morning: '早晨', midday: '中午', dusk: '傍晚', night: '夜间' } as const
-const stageNames = { morning: 'MORNING', midday: 'MIDDAY', dusk: 'DUSK', night: 'NIGHT' } as const
 const sceneAssets = Object.fromEntries(sceneKeys.map(key => [key, `/scenes/${key}.webp`])) as Record<StageKey, string>
 
 function sceneKeyByName(scene: { Name: string; DefaultName?: string }): SceneKey | null {
@@ -71,20 +69,7 @@ function inferSceneFromSource(snapshot: Snapshot, ids: Record<SceneKey, string |
   return /时间计划|Schedule/i.test(source) ? hour < 11 ? 'morning' : hour < 17 ? 'midday' : hour < 21 ? 'dusk' : 'night' : null
 }
 
-function GlassSlider({ display, label, onCommit }: { display: Display; label: string; onCommit: (value: number) => void | Promise<unknown> }) {
-  const [draft, setDraft] = useState<number | null>(null)
-  const [reveal, setReveal] = useState(false)
-  const value = draft ?? display.Brightness
-  return <div className="glass-level" onPointerEnter={() => setReveal(true)} onPointerLeave={() => setReveal(false)} onFocus={() => setReveal(true)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setReveal(false) }}>
-    <Moon className="glass-end" aria-hidden="true" />
-    <Slider aria-label={label} aria-valuetext={`${value}%`} value={[value]} min={0} max={100} step={1} disabled={!display.CanAdjust || !!display.Error}
-      onValueChange={([v]) => { setDraft(v); setReveal(true) }} onValueCommit={async ([v]) => { try { await onCommit(v) } finally { setDraft(null) } }} />
-    <Sun className="glass-end" aria-hidden="true" />
-    <output className="glass-value" data-visible={reveal || draft !== null} aria-hidden={!reveal && draft === null}>{value}%</output>
-  </div>
-}
-
-export function GlassStatus({ snapshot, error, send, close, sceneIds, embedded = false }: { snapshot: Snapshot; error: string; send: Send; close?: () => void; sceneIds: Record<SceneKey, string | null>; embedded?: boolean }) {
+export function GlassStatus({ snapshot, error, send, sceneIds }: { snapshot: Snapshot; error: string; send: Send; sceneIds: Record<SceneKey, string | null> }) {
   const { t, message, sceneName, displayName } = useI18n()
   const [linkPending, setLinkPending] = useState(false)
   const supported = snapshot.Displays.filter(d => d.CanAdjustColor)
@@ -92,27 +77,19 @@ export function GlassStatus({ snapshot, error, send, close, sceneIds, embedded =
   const status = [snapshot.Warning && message(snapshot.Warning), error && message(error), snapshot.Error && message(snapshot.Error),
     ...snapshot.Displays.filter(d => d.Error).map(d => `${displayName(d.Name)} · ${message(d.Error ?? '')}`),
     snapshot.Displays.length === 0 && t('正在检测显示器…')].filter(Boolean).join(' · ')
-  const extraScenes = snapshot.Settings.Scenes.filter(scene => !Object.values(sceneIds).includes(scene.Id) && (!embedded || !sceneKeyByName(scene)))
+  const extraScenes = snapshot.Settings.Scenes.filter(scene => !Object.values(sceneIds).includes(scene.Id) && !sceneKeyByName(scene))
   return <div className="glass-status" role="status">
-    {!embedded && <div className="glass-status-head"><span>{t('设备状态')}</span><Button variant="ghost" size="icon" aria-label={t('收起更多控制')} onClick={close}><X /></Button></div>}
     <div className="glass-status-source"><span>{t('当前来源')}</span><strong>{message(snapshot.Source)}</strong></div>
     {status && <p className="glass-alert"><AlertCircle />{status}</p>}
     <div className="glass-status-actions">
       <Button variant="ghost" size="icon" aria-label={linkLabel} aria-pressed={snapshot.Settings.Linked} aria-busy={linkPending} title={snapshot.Settings.Linked ? t('解除亮度联动') : linkLabel}
         disabled={linkPending || !snapshot.Settings.Linked && snapshot.Displays.filter(d => d.CanAdjust).length < 2}
         onClick={() => { setLinkPending(true); void send({ Action: 'link', Value: snapshot.Settings.Linked ? 0 : 1 }).finally(() => setLinkPending(false)) }}>
-        {snapshot.Settings.Linked ? <Link2 /> : <Unlink2 />}{embedded && <span>{t('亮度联动')}</span>}
+        {snapshot.Settings.Linked ? <Link2 /> : <Unlink2 />}<span>{t('亮度联动')}</span>
       </Button>
-      <Button variant="ghost" size="icon" aria-label={snapshot.FocusPaused ? t('恢复专注') : t('暂停专注')} title={snapshot.FocusPaused ? t('恢复专注') : t('暂停专注')} onClick={() => void send({ Action: 'pause' })}>{snapshot.FocusPaused ? <Play /> : <Pause />}{embedded && <span>{snapshot.FocusPaused ? t('恢复专注') : t('暂停专注')}</span>}</Button>
-      <Button variant="ghost" size="icon" aria-label={t('恢复原色')} title={t('恢复原色')} disabled={!supported.length || supported.every(d => d.Kelvin === null)} onClick={() => void send({ Action: 'restore-color' })}><RotateCcw />{embedded && <span>{t('恢复原色')}</span>}</Button>
-      {!embedded && <Button variant="ghost" size="icon" aria-label={t('重新检测显示器')} title={t('重新检测显示器')} onClick={() => void send({ Action: 'rescan' })}><RefreshCw /></Button>}
+      <Button variant="ghost" size="icon" aria-label={snapshot.FocusPaused ? t('恢复专注') : t('暂停专注')} title={snapshot.FocusPaused ? t('恢复专注') : t('暂停专注')} onClick={() => void send({ Action: 'pause' })}>{snapshot.FocusPaused ? <Play /> : <Pause />}<span>{snapshot.FocusPaused ? t('恢复专注') : t('暂停专注')}</span></Button>
+      <Button variant="ghost" size="icon" aria-label={t('恢复原色')} title={t('恢复原色')} disabled={!supported.length || supported.every(d => d.Kelvin === null)} onClick={() => void send({ Action: 'restore-color' })}><RotateCcw /><span>{t('恢复原色')}</span></Button>
     </div>
-    {!embedded && snapshot.Displays.map(display => <div className="glass-temperature" key={display.Id}>
-      <Thermometer aria-hidden="true" /><span>{displayName(display.Name)}</span>
-      <Slider aria-label={t('{0}色温', displayName(display.Name))} aria-valuetext={`${display.Kelvin ?? 6500} K`} className="temperature" value={[display.Kelvin ?? 6500]} min={2700} max={6500} step={100} disabled={!display.CanAdjustColor || !!display.Error}
-        onValueCommit={([v]) => void send({ Action: 'temperature', Id: display.Id, Value: v })} />
-      <output>{display.Kelvin ? `${display.Kelvin} K` : t('原色')}</output>
-    </div>)}
     {extraScenes.length > 0 && <div className="glass-extra-scenes">{extraScenes.map(scene => <Button key={scene.Id} variant="ghost" onClick={() => void send({ Action: 'scene', Id: scene.Id })}>{sceneName(scene)}</Button>)}</div>}
   </div>
 }
@@ -132,9 +109,7 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
     window.addEventListener(SKY_PREVIEW_EVENT, listener)
     return () => window.removeEventListener(SKY_PREVIEW_EVENT, listener)
   }, [])
-  const live = style === 'live' || (settingsOpen && skyPreview !== null)
-  const { rain, weather, city } = useWeatherRain(live, weatherOpen && !settingsOpen)
-  const fullBarOpen = !live && !settingsOpen
+  const { rain, weather, city } = useWeatherRain(true, weatherOpen && !settingsOpen)
   const ids = useMemo(() => inferSceneKeys(snapshot), [snapshot])
   const sourceScene = useMemo(() => inferSceneFromSource(snapshot, ids), [snapshot, ids])
   const [now, setNow] = useState(() => new Date())
@@ -152,33 +127,19 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
   const fallback = useCallback((): SceneKey => { const hour = now.getHours(); return hour < 11 ? 'morning' : hour < 17 ? 'midday' : hour < 21 ? 'dusk' : 'night' }, [now])
   const initial = () => sourceScene ?? timeScene ?? fallback()
   const [scene, setScene] = useState<SceneKey>(initial)
-  const [stage, setStage] = useState<StageKey>(initial)
-  const [transition, setTransition] = useState(0)
-  const [more, setMore] = useState(false)
   const [missing, setMissing] = useState('')
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const previousExternal = useRef<SceneKey | null>(sourceScene ?? timeScene)
   const syncedScene = useRef<SceneKey>(initial())
   const requestSerial = useRef(0)
   const pendingRequest = useRef<number | null>(null)
   const externalNow = sourceScene ?? timeScene
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
 
   const presentScene = useCallback((next: SceneKey) => {
     if (next === syncedScene.current) return
-    const from = syncedScene.current
     // Advance immediately: several events can arrive before React paints.
     syncedScene.current = next
     setScene(next)
-    setTransition(value => value + 1)
-    if (reduced) setStage(next)
-    if (timer.current) clearTimeout(timer.current)
-    const longJump = from !== 'dusk' && next !== 'dusk' && Math.abs(sceneKeys.indexOf(from) - sceneKeys.indexOf(next)) > 1
-    if (!reduced && !live && longJump) {
-      setStage('dusk')
-      timer.current = setTimeout(() => { setStage(next); timer.current = null }, 300)
-    } else setStage(next)
-  }, [live, reduced])
+  }, [])
 
   const change = useCallback((next: SceneKey) => {
     if (next === syncedScene.current) return
@@ -230,30 +191,15 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
     return () => window.removeEventListener('keydown', onKey)
   }, [change, settingsOpen, openSettings, weatherOpen, setWeatherOpen])
 
-  const displays = snapshot.Displays.slice(0, 2)
-  const visibleStage = settingsOpen && skyPreview ? skyPreview : stage
-  const caption = stageNames[visibleStage]
-  return <div className="scene-shell" data-scene={visibleStage} data-stage={live ? 'live' : 'classic'} data-settings-open={settingsOpen} data-weather-open={weatherOpen && !settingsOpen} data-raining={rain > 0}>
+  const visibleStage = settingsOpen && skyPreview ? skyPreview : scene
+  return <div className="scene-shell" data-scene={visibleStage} data-stage="live" data-background={style} data-settings-open={settingsOpen} data-weather-open={weatherOpen && !settingsOpen} data-raining={rain > 0}>
     <div className="scene-backdrop" aria-hidden="true">
-      {live ? <><LiveSceneStage key="live" scene={visibleStage} reduced={!!reduced} /><SkyEffects scene={visibleStage} reduced={!!reduced} /><RainAtmosphere rain={rain} scene={visibleStage} /></> : (Object.keys(sceneAssets) as StageKey[]).map(key => <div key={key} className="scene-image" data-active={stage === key} style={{ backgroundImage: `url('${sceneAssets[key]}')` }} />)}
+      {style === 'live' ? <LiveSceneStage key="live" scene={visibleStage} reduced={!!reduced} /> : sceneKeys.map(key => <div key={key} className="scene-image" data-active={visibleStage === key} style={{ backgroundImage: `url('${sceneAssets[key]}')` }} />)}
+      <SkyEffects scene={visibleStage} reduced={!!reduced} /><RainAtmosphere rain={rain} scene={visibleStage} />
     </div>
     <div className="window-drag-region" data-app-region="drag" aria-hidden="true" />
     <div className="scene-wash" aria-hidden="true" />
-    {live && !reduced && <div className="live-stage-breath" aria-hidden="true" data-scene={visibleStage} />}
-    <h1 className="scene-title" aria-live="polite">{caption}</h1>
-    <AnimatePresence mode="wait" initial={false}>
-      {!live && !reduced && <motion.div key={transition} className="scene-kinetic" aria-hidden="true" initial={{ opacity: 0, filter: 'blur(14px)', letterSpacing: '.02em' }} animate={{ opacity: [0, .18, 0], filter: ['blur(14px)', 'blur(0px)', 'blur(10px)'], letterSpacing: ['.02em', '.08em', '.32em'] }} exit={{ opacity: 0 }} transition={{ duration: 1.05, ease: [.2, .7, .2, 1] }}>{caption}</motion.div>}
-    </AnimatePresence>
-    <AnimatePresence mode="wait" initial={false}>
-      {!live && !reduced && <motion.div key={`wipe-${transition}`} className="scene-wipe" aria-hidden="true" initial={{ x: '-55%', opacity: 0 }} animate={{ x: '55%', opacity: [0, 1, 0] }} exit={{ opacity: 0 }} transition={{ duration: 1, ease: [.3, 0, .2, 1] }} />}
-    </AnimatePresence>
-
-    <div className="scene-display-hint" aria-hidden="true">{displays.map((display, index) => {
-      const Icon = index === 1 ? Laptop : Monitor
-      return <Icon key={display.Id} className="scene-display-icon" data-index={index} />
-    })}</div>
-
-    {live ? <>
+    {!reduced && <div className="live-stage-breath" aria-hidden="true" data-scene={visibleStage} />}
       <motion.section className="scene-capsule" aria-label={t('场景')} data-bar-style={barStyle} aria-hidden={settingsOpen} inert={settingsOpen} style={{ opacity: capsuleOpacity }}>
         {sceneKeys.map(key => {
           const Icon = sceneIcons[key]
@@ -263,36 +209,13 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
         })}
       </motion.section>
       <motion.button type="button" className="scene-expand-hint" aria-label={t('设置')} title={t('设置')} aria-hidden={settingsOpen} inert={settingsOpen} style={{ opacity: capsuleOpacity }} onClick={openSettings}><ChevronUp /></motion.button>
-    </> : null}
 
-    <motion.section className={`glass-strip${live ? ' glass-strip-expanded' : ''}`} aria-label={t('场景')} hidden={live} aria-hidden={settingsOpen} inert={settingsOpen} style={{ opacity: capsuleOpacity }}>
-      <div className="glass-levels">
-        {displays.map((display, index) => <GlassSlider key={display.Id} display={display} label={t('{0}亮度', index === 1 ? t('笔记本屏幕') : display.Name)} onCommit={Value => send({ Action: 'brightness', Id: display.Id, Value })} />)}
-        {displays.length === 0 && <p className="glass-empty">{t('正在检测显示器…')}</p>}
-        {displays.length === 1 && <p className="glass-empty">{t('正在检测显示器…')}</p>}
-      </div>
-      <div className="glass-controls">
-        <div className="glass-scenes">
-        {sceneKeys.map(key => {
-          const Icon = sceneIcons[key]
-          return <Button key={key} variant="ghost" className="glass-scene-button" data-active={scene === key} aria-label={t(sceneNames[key])} aria-pressed={scene === key} title={t(sceneNames[key])} onClick={() => change(key)}><Icon /></Button>
-        })}
-        </div>
-        <div className="glass-secondary">
-
-          <Button variant="ghost" size="icon" className="glass-icon-button" aria-label={more ? t('收起更多控制') : t('更多控制')} aria-expanded={more} title={more ? t('收起更多控制') : t('更多控制')} onClick={() => setMore(value => !value)}><SlidersHorizontal /></Button>
-          <Button variant="ghost" size="icon" className="glass-icon-button" aria-label={t('设置')} title={t('设置')} onClick={openSettings}><Settings2 /></Button>
-        </div>
-      </div>
-    </motion.section>
-
-    <AnimatePresence>{more && fullBarOpen && <motion.div className={`glass-more${live ? ' glass-more-live' : ''}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: .18 }}><GlassStatus snapshot={snapshot} error={error} send={send} sceneIds={ids} close={() => setMore(false)} /></motion.div>}</AnimatePresence>
     {!settingsOpen && <AnimatePresence initial={false}>{weatherOpen && <Suspense key="weather" fallback={null}><WeatherPanel city={city} weather={weather} reduced={!!reduced} chooseLocation={chooseWeatherLocation} /></Suspense>}</AnimatePresence>}
     {children}
-    <SettingsMorphSurface anchorKey={`${live}-${barStyle}`} />
-    {live && <WeatherRainOverlay rain={rain} reduced={!!reduced} settingsOpen={settingsOpen} />}
+    <SettingsMorphSurface anchorKey={barStyle} />
+    <WeatherRainOverlay rain={rain} reduced={!!reduced} settingsOpen={settingsOpen} background={style} />
     {missing && <p className="scene-missing" role="status">{missing}</p>}
     {demo && <p className="scene-demo" role="status">{t('此浏览器预览只展示界面，不控制硬件。')}</p>}
-    {!(more && fullBarOpen) && (snapshot.Warning || snapshot.Error || error || snapshot.Displays.some(d => d.Error)) && <p className="scene-alert" role="alert"><AlertCircle />{[snapshot.Warning, snapshot.Error, error, ...snapshot.Displays.filter(d => d.Error).map(d => d.Error)].filter(Boolean).join(' · ')}</p>}
+    {(snapshot.Warning || snapshot.Error || error || snapshot.Displays.some(d => d.Error)) && <p className="scene-alert" role="alert"><AlertCircle />{[snapshot.Warning, snapshot.Error, error, ...snapshot.Displays.filter(d => d.Error).map(d => d.Error)].filter(Boolean).join(' · ')}</p>}
   </div>
 }

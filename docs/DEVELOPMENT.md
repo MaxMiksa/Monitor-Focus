@@ -2,6 +2,8 @@
 
 ## 工程与环境
 
+统一首页：`scene-panel.tsx` 仅有新版胶囊与设置入口，背景选择不再分叉控件、天空预览或天气能力；双机器只复用原四图与交叉淡入。`stage-preference.ts` 首次读取将旧 `monitors-focus.stage-style` 迁移至 `monitors-focus.background-style`，仅在新键不存在时继承选择，写入成功后删除旧键，不清空共享偏好／缓存。`wind-rain-runtime.js` 复用同一个雨画布与粒子上限，以底图原尺寸的 cover 投影计算单／双机器斜边交点，背景改变清掉旧水花并重算投影；双机器天空使用轻量 SVG 遮罩。`build/diagnostics/background-unification/` 保留正式构建日志、样式／偏好迁移／双机器命中／开关释放验收和截图，天气是测试数据；部署见 `background-unification-20261116-update.json`。原生构建沿用 `weather-location/native-source/source-overlay.json` 隔离在途硬件修改，未包含原型页修改；未验收长期运行。
+
 首页天气卡片：`weather-panel.tsx` 按需加载、退出后卸载，使用本地彩色 SVG，无新增画布、轮询所有者或硬件动作；`App` 管理默认隐藏／Esc 优先级，首页导航保持设置／天气互斥并过滤按住 ↑ 的重复事件，地区入口复用通用设置。卡片与设置共用玻璃材质变量和字号。`weather-details.ts` 校验所选地点时区的今日最低／最高温及跨午夜未来三小时数据，规则生成建议；请求显式摄氏度／km/h，当前＋两天日界＋四个小时数据由原天气所有者一次读取，未来字段缺失则不给建议，不用全市坐标或旧日期数据凑数。仍兼容旧雨缓存；跨日触发刷新，失败回到正常重试间隔，不热循环；停用雨景且收起卡片时取消请求／清理计时。`build/diagnostics/weather-panel/` 保存确认布局、实时 API 样本、八项规则和浏览器验收、1024 DIP 英文／减少动态效果／旧舞台截图、原生 WebView2＋模拟核心键盘验收及正式构建日志；天气画面使用测试数据，不是南山实况。部署见 `build/diagnostics/weather-panel-20261116-update.json`；原生改动隔离沿用 `weather-location/native-source/source-overlay.json`，未加入其他任务的原生／原型页改动。
 
 天气位置：`frontend/src/lib/weather.ts` 保持原 `WeatherCity` 本地存储结构，搜索结果补全所属城市和层级；无匹配时对中文区县后缀及组合名做有界回退，组合名必须匹配返回行政层级，仍须用户显式选择。缓存键含地点 ID 与经纬度，换区县不复用全市天气；不改天气轮询、桥权限或硬件配置。`build/diagnostics/weather-location/` 保存实时地名响应、六种查询与取消／旧偏好兼容检查、正式前端真实地名搜索／坐标切换／撤销／重做／重载验收和构建日志；天气响应为测试专用晴天，不代表南山实况。正式构建用同目录 `native-source/source-overlay.json` 隔离其他未提交原生改动，未包含原型页；部署见 `build/diagnostics/weather-location-20261116-update.json`。
@@ -132,7 +134,7 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 ## 连续场景过渡
 
-设置页／场景栏共用 `settings-morph.tsx` 的空玻璃外框，Motion 阻尼弹簧保留反向时速度；上下文仅共享进度与两端矩形，ResizeObserver 随窗口／栏宽更新锚点。外框位置、尺寸、圆角、材质及阴影随同一进度插值；设置内容不缩放，仅裁切／淡入淡出；场景内容在最后 3.5% 形变中交接。保持设置挂载和草稿，立即切换 inert，不依赖延时定时器；无截图／画布／纹理缓存，卸载释放观察器。系统减少动态效果时直接跳至终态。逐帧证据 `build/diagnostics/settings-morph/frames.json` 覆盖开关、90ms 间隔五次反向、图标／图文胶囊与旧版栏，验证无两组内容重叠、外框有界及文字 transform 为 none；未实测系统减少动态效果与长期占用。
+设置页／场景栏共用 `settings-morph.tsx` 的空玻璃外框，Motion 阻尼弹簧保留反向时速度；上下文仅共享进度与两端矩形，ResizeObserver 随窗口／栏宽更新锚点。外框位置、尺寸、圆角、材质及阴影随同一进度插值；设置内容不缩放，仅裁切／淡入淡出；场景内容在最后 3.5% 形变中交接。保持设置挂载和草稿，立即切换 inert，不依赖延时定时器；无截图／画布／纹理缓存，卸载释放观察器。系统减少动态效果时直接跳至终态。逐帧证据 `build/diagnostics/settings-morph/frames.json` 覆盖开关、90ms 间隔五次反向、图标／图文胶囊，验证无两组内容重叠、外框有界及文字 transform 为 none；未实测系统减少动态效果与长期占用。
 
 `ScenePanel` 以同步 ref 记录最新选择，按键和点击不依赖上一帧 React 状态；请求序号只允许最新手动请求结束等待，串行硬件中间回报不覆盖新目标，结束后恢复外部场景同步。仅增加常量状态，不增加画布／纹理／历史快照。`build/diagnostics/scene-input-fix/verification.json` 记录同帧正反向三次、两条中间回报与等待结束后的外部同步；浏览器使用真实组件和受控回报，不写硬件。
 

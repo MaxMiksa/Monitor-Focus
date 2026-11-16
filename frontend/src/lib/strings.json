@@ -228,9 +228,6 @@
   "亮度调节失败：{0}": "Brightness adjustment failed: {0}",
   "边缘滚轮监听失败：{0}": "Edge scrolling unavailable: {0}",
   "操作过快，请稍后重试。": "Too many adjustments. Please try again shortly.",
-  "主界面样式": "Main interface style",
-  "新版实时换光": "New live lighting",
-  "当前版整页换肤": "Current page transition",
   "场景栏样式": "Scene bar style",
   "仅文字": "Text only",
   "仅图标": "Icons only",
@@ -284,7 +281,6 @@
   "正在搜索…": "Searching…",
   "未找到地点，请尝试区县名、拼音或英文": "No places found. Try a district name, pinyin or English.",
   "地点搜索失败，请重试": "Location search failed. Try again.",
-  "雨景需使用实时换光": "Rain requires the live stage",
   "正在预览雨景（30 秒）": "Rain preview (30 seconds)",
   "正在获取天气…": "Loading weather…",
   "天气获取失败，稍后重试": "Weather unavailable. Retrying later.",
@@ -337,5 +333,8 @@
   "未来几小时有雨，记得带伞": "Rain ahead; bring an umbrella",
   "可能有零星雨，随身备伞": "A little rain possible; pack an umbrella",
   "天气较热，留意遮阳补水": "Warm weather; seek shade and hydrate",
-  "未来几小时少雨，适合出行": "Little rain ahead; good for going out"
+  "未来几小时少雨，适合出行": "Little rain ahead; good for going out",
+  "首页背景": "Home background",
+  "单机器背景": "Single-machine background",
+  "双机器背景": "Dual-machine background"
 }

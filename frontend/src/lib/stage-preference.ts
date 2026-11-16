@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 
 export type StageStyle = 'live' | 'classic'
 export type SceneBarStyle = 'text' | 'icon' | 'both'
-export const STAGE_STYLE_KEY = 'monitors-focus.stage-style'
+export const STAGE_STYLE_KEY = 'monitors-focus.background-style'
+const OBSOLETE_STAGE_KEY = 'monitors-focus.stage-style'
 export const SCENE_BAR_STYLE_KEY = 'monitors-focus.scene-bar-style'
 export const AIR_OPACITY_KEY = 'monitors-focus.air-opacity'
 export const PREFERENCE_EVENT = 'monitors-focus-preferences'
@@ -39,6 +40,12 @@ export function useAirOpacity(): [number, (value: number) => void] {
 
 export function readStageStyle(): StageStyle {
   try {
+    // Preserve the chosen pictures, not the retired interface or its key.
+    const previous = localStorage.getItem(OBSOLETE_STAGE_KEY)
+    if (previous !== null) {
+      if (localStorage.getItem(STAGE_STYLE_KEY) === null) localStorage.setItem(STAGE_STYLE_KEY, previous === 'classic' ? 'classic' : 'live')
+      localStorage.removeItem(OBSOLETE_STAGE_KEY)
+    }
     return localStorage.getItem(STAGE_STYLE_KEY) === 'classic' ? 'classic' : 'live'
   } catch {
     return 'live'

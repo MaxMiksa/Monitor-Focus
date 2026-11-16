@@ -1,5 +1,5 @@
 export type RainEdge = { left: number; right: number; top: number }
-export type RainEdges = RainEdge[] & { settingsOpen?: boolean }
+export type RainEdges = RainEdge[] & { settingsOpen?: boolean; background?: 'live' | 'classic' }
 export type RainRuntime = {
   setAmount(value: number): void
   setPaused(value: boolean): void

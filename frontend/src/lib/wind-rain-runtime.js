@@ -66,8 +66,14 @@ export function createWindRain(slot, report) {
   let lastTime = performance.now(), statsTime = lastTime, frames = 0
   const systems = []
   let getEdges = () => []
-  const targets = [{ left: 722, right: 945, top: 378 }, { left: 0, right: 0, top: 0 }, { left: 0, right: 0, top: 0 }]
-  let targetCount = 1, uiHits = 0, roofEnabled = true, splashSurface = 0
+  const roofs = {
+    live: [{ left: 722, right: 945, top: 378, end: 378 }],
+    classic: [{ left: 540, right: 1015, top: 356, end: 382 }, { left: 1124, right: 1368, top: 541, end: 535 }],
+  }
+  const targets = Array.from({ length: 4 }, () => ({ left: 0, right: 0, top: 0, end: 0 }))
+  let background = 'live', sourceWidth = 1672, sourceHeight = 941
+  let roofCount = 1, targetCount = 1, uiHits = 0, roofEnabled = true, splashSurface = 0
+  const machineHits = [0, 0]
   const projected = new T.Vector3(), predicted = new T.Vector3(), impact = new T.Vector3()
   const impactMatrix = new T.Matrix4()
   const burst = { isBursting: false, burstParticleIndex: 0, burstParticleCount: 0, burstIndex: 0, burstWaveIndex: 0, time: 0, waitEmiting: 0, travelDistance: 0 }
@@ -135,20 +141,24 @@ export function createWindRain(slot, report) {
       projected.copy(particle.position)
       predicted.copy(particle.position).addScaledVector(particle.velocity, delta)
       sourcePoint(projected); sourcePoint(predicted)
-      if (predicted.x < 0 || predicted.x > 1672 || predicted.y <= projected.y) return
+      if (predicted.x < 0 || predicted.x > sourceWidth || predicted.y <= projected.y) return
       for (let index = 0; index < targetCount; index++) {
-        if (index === 0 && !roofEnabled) continue
+        if (index < roofCount && !roofEnabled) continue
         const target = targets[index]
-        if (projected.y > target.top || predicted.y < target.top) continue
-        const fraction = (target.top - projected.y) / (predicted.y - projected.y)
+        const slope = (target.end - target.top) / Math.max(1, target.right - target.left)
+        const before = projected.y - target.top - (projected.x - target.left) * slope
+        const after = predicted.y - target.top - (predicted.x - target.left) * slope
+        if (before > 0 || after < 0 || after <= before) continue
+        const fraction = -before / (after - before)
         const sourceX = projected.x + (predicted.x - projected.x) * fraction
         if (sourceX < target.left || sourceX > target.right) continue
         impact.copy(particle.position).addScaledVector(particle.velocity, delta * fraction)
         hits++
-        if (index > 0) uiHits++
+        if (index < roofCount) machineHits[index]++
+        if (index >= roofCount) uiHits++
         // A splash accent never blocks or changes the falling rain.
         if (splashEnabled) {
-          splashSurface = index
+          splashSurface = index < roofCount ? 0 : 1
           if (splashes.particleNum <= MAX_SPLASH - 2 && Math.random() < .35) emitAt(splashes, impact)
           if (arcs.particleNum < MAX_ARCS && Math.random() < .18) emitAt(arcs, impact)
         }
@@ -175,7 +185,9 @@ export function createWindRain(slot, report) {
     const count = systems.reduce((sum, entry) => sum + entry.system.particleNum, 0)
     canvas.dataset.rain = String(count); canvas.dataset.splash = String(splashes.particleNum + arcs.particleNum)
     canvas.dataset.arcs = String(arcs.particleNum)
-    canvas.dataset.uiHits = String(uiHits); canvas.dataset.uiEdges = String(targetCount - 1)
+    canvas.dataset.uiHits = String(uiHits); canvas.dataset.uiEdges = String(targetCount - roofCount)
+    canvas.dataset.background = background; canvas.dataset.machineEdges = String(roofCount)
+    canvas.dataset.machineHits = machineHits.slice(0, roofCount).join(',')
     canvas.dataset.roofEnabled = String(roofEnabled)
     canvas.dataset.roofSplash = String([splashes, arcs].reduce((sum, system) => {
       for (let index = 0; index < system.particleNum; index++) {
@@ -184,7 +196,7 @@ export function createWindRain(slot, report) {
       }
       return sum
     }, 0))
-    canvas.dataset.edgeY = targetCount > 1 ? targets[1].top.toFixed(2) : ''
+    canvas.dataset.edgeY = targetCount > roofCount ? targets[roofCount].top.toFixed(2) : ''
     canvas.dataset.hits = String(hits); canvas.dataset.phase = phase.toFixed(3)
     canvas.dataset.splashEnabled = String(splashEnabled)
     canvas.dataset.rainRate = String(Math.round(systems.reduce((sum, entry) => sum + entry.rate.value, 0)))
@@ -193,8 +205,8 @@ export function createWindRain(slot, report) {
   }
   function resize() {
     width = Math.max(1, slot.clientWidth); height = Math.max(1, slot.clientHeight)
-    scale = Math.max(width / 1672, height / 941)
-    offsetX = (width - 1672 * scale) / 2; offsetY = (height - 941 * scale) / 2
+    scale = Math.max(width / sourceWidth, height / sourceHeight)
+    offsetX = (width - sourceWidth * scale) / 2; offsetY = (height - sourceHeight * scale) / 2
     renderer.setSize(width, height, false)
     camera.aspect = width / height; camera.updateProjectionMatrix()
     systems.forEach(({ system }) => system.restart()); splashes.restart(); arcs.restart()
@@ -202,8 +214,20 @@ export function createWindRain(slot, report) {
   }
   function refreshTargets() {
     const edges = getEdges()
+    const nextBackground = edges.background === 'classic' ? 'classic' : 'live'
+    const backgroundChanged = background !== nextBackground
+    if (backgroundChanged) {
+      background = nextBackground
+      machineHits.fill(0)
+      sourceWidth = background === 'classic' ? 1920 : 1672
+      sourceHeight = background === 'classic' ? 1080 : 941
+      splashes.restart(); arcs.restart()
+      resize()
+    }
+    roofCount = roofs[background].length
+    roofs[background].forEach((edge, index) => Object.assign(targets[index], edge))
     const nextRoofEnabled = !edges.settingsOpen
-    const changed = roofEnabled !== nextRoofEnabled
+    const changed = roofEnabled !== nextRoofEnabled || backgroundChanged
     if (roofEnabled && !nextRoofEnabled) {
       for (const system of [splashes, arcs]) {
         for (let index = 0; index < system.particleNum; index++) {
@@ -213,11 +237,12 @@ export function createWindRain(slot, report) {
       }
     }
     roofEnabled = nextRoofEnabled
-    targetCount = Math.min(edges.length, 2) + 1
-    for (let index = 1; index < targetCount; index++) {
-      const edge = edges[index - 1], target = targets[index]
+    targetCount = Math.min(edges.length, 2) + roofCount
+    for (let index = roofCount; index < targetCount; index++) {
+      const edge = edges[index - roofCount], target = targets[index]
       target.left = (edge.left - offsetX) / scale; target.right = (edge.right - offsetX) / scale
       target.top = (edge.top - offsetY) / scale
+      target.end = target.top
     }
     return changed
   }

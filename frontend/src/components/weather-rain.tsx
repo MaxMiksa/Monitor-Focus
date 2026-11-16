@@ -8,10 +8,10 @@ export function RainAtmosphere({ rain, scene }: { rain: number; scene: StageKey 
   return <div className="weather-rain-atmosphere" data-night={scene === 'night'} aria-hidden="true" style={{ opacity: rainMoodOpacity(rain, scene === 'night') }} />
 }
 
-export function WeatherRainOverlay({ rain, reduced, settingsOpen }: { rain: number; reduced: boolean; settingsOpen: boolean }) {
+export function WeatherRainOverlay({ rain, reduced, settingsOpen, background = 'live' }: { rain: number; reduced: boolean; settingsOpen: boolean; background?: 'live' | 'classic' }) {
   const host = useRef<HTMLDivElement>(null)
   const runtime = useRef<RainRuntime | null>(null)
-  const current = useRef({ rain, settingsOpen })
+  const current = useRef({ rain, settingsOpen, background })
   const [visible, setVisible] = useState(!document.hidden)
   const active = rain > 0 && !reduced && visible
   useEffect(() => {
@@ -20,10 +20,10 @@ export function WeatherRainOverlay({ rain, reduced, settingsOpen }: { rain: numb
     return () => document.removeEventListener('visibilitychange', sync)
   }, [])
   useLayoutEffect(() => {
-    current.current = { rain, settingsOpen }
+    current.current = { rain, settingsOpen, background }
     runtime.current?.setAmount(rain)
     runtime.current?.refreshEdges()
-  }, [rain, settingsOpen])
+  }, [rain, settingsOpen, background])
   useEffect(() => {
     const element = host.current
     if (!active || !element) return
@@ -32,6 +32,7 @@ export function WeatherRainOverlay({ rain, reduced, settingsOpen }: { rain: numb
     const pool = [{ left: 0, right: 0, top: 0 }, { left: 0, right: 0, top: 0 }]
     const getEdges = () => {
       edges.length = 0; edges.settingsOpen = current.current.settingsOpen
+      edges.background = current.current.background
       const root = element.parentElement
       if (!root) return edges
       const origin = element.getBoundingClientRect()

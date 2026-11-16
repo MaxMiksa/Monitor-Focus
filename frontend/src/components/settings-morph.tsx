@@ -34,7 +34,7 @@ export function SettingsMorphSurface({ anchorKey }: { anchorKey: string }) {
   const { progress, bounds } = useSettingsMorph()
   useLayoutEffect(() => {
     const root = surface.current?.parentElement
-    const anchor = root?.querySelector<HTMLElement>('.scene-capsule:not([hidden]), .glass-strip:not([hidden])')
+    const anchor = root?.querySelector<HTMLElement>('.scene-capsule')
     const panel = root?.querySelector<HTMLElement>('.settings-float')
     if (!root || !anchor || !panel) return
     const measure = () => {
