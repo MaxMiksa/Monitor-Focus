@@ -338,5 +338,11 @@
   "未来几小时少雨，适合出行": "Little rain ahead; good for going out",
   "首页背景": "Home background",
   "单机器背景": "Single-machine background",
-  "双机器背景": "Dual-machine background"
+  "双机器背景": "Dual-machine background",
+  "编辑时间点": "Edit time point",
+  "时间点时间": "Time",
+  "时间点场景": "Scene",
+  "删除时间点": "Delete time point",
+  "时间点重复或渐变重叠，请调整时间或缩短渐变时长。": "Duplicate time or overlapping transition. Choose another time or shorten the transition.",
+  "确定": "Confirm"
 }

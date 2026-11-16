@@ -18,8 +18,9 @@ import { SortableList } from '@/components/sortable-list'
 import { DisplayRow, Level } from '@/App'
 import type { Send } from '@/App'
 import { captureBehavior } from '@/lib/control'
-import type { Display, EdgeWheelModifier, Settings, Snapshot } from '@/lib/control'
+import type { Display, EdgeWheelModifier, Snapshot } from '@/lib/control'
 
+const ScheduleChart = lazy(() => import('./schedule-chart').then(module => ({ default: module.ScheduleChart })))
 const WeatherSettings = lazy(() => import('./weather-settings').then(module => ({ default: module.WeatherSettings })))
 const SkySettingsEditor = lazy(() => import('./sky-settings').then(module => ({ default: module.SkySettingsEditor })))
 
@@ -79,11 +80,8 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
       <GlassStatus snapshot={snapshot} send={deviceSend} error="" sceneIds={{ morning: null, midday: null, dusk: null, night: null }} />
     </>}
     {page === 'schedule' && <>
-      <ScheduleChart settings={draft} snapshot={snapshot} />
-      <SortableList items={draft.Schedule} getKey={point => point.key} getLabel={(_, i) => t('调整时间点 {0} 的顺序', i + 1)} onReorder={points => change(s => { const times = s.Schedule.map(point => point.MinuteOfDay); s.Schedule = points.map((point, index) => ({ ...point, MinuteOfDay: times[index] })) })}>
-        {(point, i, handle) => <div className="plan-row">{handle}<input aria-label={t('时间点 {0}', i + 1)} type="time" required value={`${String(Math.floor(point.MinuteOfDay / 60)).padStart(2, '0')}:${String(point.MinuteOfDay % 60).padStart(2, '0')}`} onChange={e => { if (!e.target.value) return; const [h, m] = e.target.value.split(':').map(Number); change(s => { s.Schedule[i].MinuteOfDay = h * 60 + m }) }} /><Select aria-label={t('时间点 {0} 场景', i + 1)} value={point.SceneId} onValueChange={value => change(s => { s.Schedule[i].SceneId = value })} options={draft.Scenes.map(scene => ({ value: scene.Id, label: sceneName(scene) }))} /><Button aria-label={t('删除时间点 {0}', i + 1)} variant="ghost" size="icon" onClick={() => change(s => { s.Schedule.splice(i, 1) })}><Trash2 /></Button></div>}
-      </SortableList>
-      <div className="actions schedule-actions"><div className="schedule-enable"><label htmlFor="schedule">{t('自动渐变')}</label><Switch id="schedule" checked={draft.ScheduleEnabled} onCheckedChange={on => change(s => { s.ScheduleEnabled = on })} /></div><div className="global-transition"><input aria-label={t('渐变时长（分钟）')} type="number" min={0} max={1440} placeholder="—" value={mixedTransition ? '' : transitionMinutes} onChange={e => { const minutes = e.target.valueAsNumber; if (!Number.isInteger(minutes) || minutes < 0 || minutes > 1440) return; change(s => { s.ScheduleTransitionMinutes = minutes; s.Schedule.forEach(point => { point.TransitionMinutes = minutes }) }) }} /><span>{t('分钟')}</span></div><Button variant="outline" disabled={!draft.Scenes.length} onClick={() => change(s => { s.Schedule.push({ key: crypto.randomUUID(), MinuteOfDay: 1080, SceneId: s.Scenes[0].Id, TransitionMinutes: transitionMinutes }) })}><Plus />{t('添加时间点')}</Button></div>
+      <ScheduleChart active={open} settings={draft} snapshot={snapshot} onChange={points => change(s => { s.Schedule = points })} />
+      <div className="actions schedule-actions"><div className="schedule-enable"><label htmlFor="schedule">{t('自动渐变')}</label><Switch id="schedule" checked={draft.ScheduleEnabled} onCheckedChange={on => change(s => { s.ScheduleEnabled = on })} /></div><div className="global-transition"><input aria-label={t('渐变时长（分钟）')} type="number" min={0} max={1440} placeholder="—" value={mixedTransition ? '' : transitionMinutes} onChange={e => { const minutes = e.target.valueAsNumber; if (!Number.isInteger(minutes) || minutes < 0 || minutes > 1440) return; change(s => { s.ScheduleTransitionMinutes = minutes; s.Schedule.forEach(point => { point.TransitionMinutes = minutes }) }) }} /><span>{t('分钟')}</span></div></div>
     </>}
     {page === 'scenes' && <>
       <div className="scene-edit-list"><SortableList items={draft.Scenes} getKey={scene => scene.Id} getLabel={(scene) => t('调整场景「{0}」的顺序', sceneName(scene))} onReorder={scenes => change(s => { s.Scenes = scenes })}>
@@ -170,27 +168,4 @@ function ControlledDisplays({ id, snapshot, value, onChange }: { id: string; sna
     <div className="form-row"><label htmlFor={`${id}-controlled`}>{t('参与专注的副屏')}</label><Select id={`${id}-controlled`} value={value === null ? 'all' : 'selected'} onValueChange={selected => onChange(selected === 'all' ? null : displays.map(d => d.Id))} options={[{ value: 'all', label: t('全部副屏') }, { value: 'selected', label: t('指定副屏') }]} /></div>
     {value !== null && [...displays.map(d => ({ Id: d.Id, Name: displayName(d.Name) })), ...offline.map(Id => ({ Id, Name: t('{0}（离线）', Id) }))].map(d => <div className="form-row" key={d.Id}><label htmlFor={`${id}-controlled-${d.Id}`}>{d.Name}</label><Switch id={`${id}-controlled-${d.Id}`} checked={value.includes(d.Id)} onCheckedChange={on => onChange(on ? [...value, d.Id] : value.filter(key => key !== d.Id))} /></div>)}
   </>
-}
-function ScheduleChart({ settings, snapshot }: { settings: Settings; snapshot: Snapshot }) {
-  const { t } = useI18n()
-  const display = snapshot.Displays.find(d => d.CanAdjustColor) ?? snapshot.Displays[0]
-  const points = [...settings.Schedule].sort((a, b) => a.MinuteOfDay - b.MinuteOfDay)
-  const valid = display && points.length && new Set(points.map(p => p.MinuteOfDay)).size === points.length && points.every((p, i) => settings.Scenes.some(s => s.Id === p.SceneId) && p.TransitionMinutes >= 0 && p.TransitionMinutes <= ((points[(i + 1) % points.length].MinuteOfDay - p.MinuteOfDay + 1440) % 1440 || 1440))
-  const brightness: string[] = [], color: string[] = []
-  if (valid) for (let minute = 0; minute <= 1440; minute += 2) {
-    const time = minute % 1440
-    let index = points.findLastIndex(p => p.MinuteOfDay <= time)
-    if (index < 0) index = points.length - 1
-    const point = points[index], prior = points[(index + points.length - 1) % points.length]
-    const target = settings.Scenes.find(s => s.Id === point.SceneId)?.Targets[display.Id]
-    const from = settings.Scenes.find(s => s.Id === prior.SceneId)?.Targets[display.Id] ?? target
-    if (!target || !from) continue
-    const elapsed = (time - point.MinuteOfDay + 1440) % 1440
-    const progress = point.TransitionMinutes === 0 ? 1 : Math.min(1, elapsed / point.TransitionMinutes)
-    const t = progress * progress * (3 - 2 * progress)
-    const x = 24 + minute / 1440 * 592
-    brightness.push(`${x},${170 - (from.Brightness + (target.Brightness - from.Brightness) * t) * 1.3}`)
-    if (display.CanAdjustColor) { const k = (from.Kelvin ?? 6500) + ((target.Kelvin ?? 6500) - (from.Kelvin ?? 6500)) * t; color.push(`${x},${170 - (k - 2700) / 3800 * 130}`) }
-  }
-  return <div className="chart schedule-chart" role="img" aria-label={t('当前编辑计划的亮度和色温曲线')}><svg viewBox="0 0 640 190" aria-hidden="true">{[0, 50, 100].map(v => <line key={v} x1="24" x2="616" y1={170 - v * 1.3} y2={170 - v * 1.3} stroke="var(--color-border)" />)}{valid ? <><polyline points={brightness.join(' ')} fill="none" stroke="var(--color-primary)" strokeWidth="2" /><polyline points={color.join(' ')} fill="none" stroke="var(--warm)" strokeWidth="2" /></> : points.length ? <text x="170" y="110">{t('请检查时间点和渐变时长')}</text> : null}</svg><div className="schedule-time-axis" aria-hidden="true">{[0, 6, 12, 18, 24].map(h => <span key={h} style={{ left: `${h / 24 * 100}%`, transform: `translateX(${h === 0 ? 0 : h === 24 ? -100 : -50}%)` }}>{String(h).padStart(2, '0')}:00</span>)}</div></div>
 }

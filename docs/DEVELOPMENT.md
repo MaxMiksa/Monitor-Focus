@@ -149,3 +149,9 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 - 验收：快速三场景切换、真实 WebGL 晴天／雨天衔接与过时加载均通过，平均 8 位像素差 0.09～0.22，无 GL 错误；峰值 5、空闲 3、销毁 0 张纹理（均含共用 mask／图集）。证据为 `build/diagnostics/scene-interrupt/gpu-check.json`，正式构建日志见同目录 `production-build.log`。未验证长期 CPU／显存走势或所有机器的流畅度。
 
 当前正式包以 STATUS.md 为准；界面内存优化的部署／目标与专注保留／唯一自启证据为 `build/diagnostics/memory-demand-20261116-update.json`，包保留结果见同前缀 retention 文件。发布使用已提交原生基线叠加本轮六个前端文件，未夹带工作区未完成的显示／恢复修改；临时源码和测试环境已回收。
+
+## 渐变交互图
+
+`schedule-chart.tsx` 按页懒加载，保留单个 SVG／原渐变采样，不增加 Canvas、WebGL、动画循环或大型时间轴依赖；图形采样只缓存当前两条曲线字符串，鼠标悬停不重新采样。圆点与标签放在底部时间轴；Pointer Capture 拖动仅保留当前节点预览，松手一次提交共享历史，取消不保存。离页／收拢后随设置内容卸载；弹层仅打开时挂载，采用 [Radix Popover](https://www.radix-ui.com/primitives/docs/components/popover)，场景选择沿用全局 Select。原生时间输入通过 input 事件同步；Esc 优先关闭弹层，普通节点焦点仍允许收起设置。纯规则 `schedule-edit.ts` 镜像原生跨午夜、重复分钟及下一节点间距约束，冲突拒绝提交，不暗改场景或时长。
+
+`build/diagnostics/schedule-chart/` 保留布局截图、交互／资源观察摘要及正式构建日志；浏览器预览不写硬件，验证添加、精确时间／场景、拖动后一次撤销、重复／重叠拒绝、删除／撤销重做、Esc 优先级、离页无图表／弹层；边界规则10项通过。资源观察为1个SVG、0个图表画布、0个右侧节点行，无浏览器错误，不代表实测内存降低。正式构建用原生已提交基线 bef9385，隔离工作区显示／恢复及原型页的其他修改，临时源码已回收。部署包 `build/packages/20261116-160754-107/`；显示目标／专注、无错误与唯一自启及保留五包证据为 `schedule-chart-20261116-update.json`／`-retention.json`。未重复原生画面、长期内存／显存或硬件计划触发验收。
