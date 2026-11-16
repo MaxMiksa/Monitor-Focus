@@ -43,6 +43,9 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
   const navigation = useRef<HTMLElement>(null)
   const [weatherSearch, setWeatherSearch] = useState<WeatherSearchDraft>({ query: '', editing: false })
   const { draft, change, undo, redo, reload, flush, saving, status, hasFailure, canUndo, canRedo } = useSettingsHistory(snapshot, send)
+  const weatherCity = draft.appearance.weather.city
+  const solarLocation = weatherCity ? { Name: weatherCity.name, Latitude: weatherCity.latitude, Longitude: weatherCity.longitude } : draft.SolarLocation ?? null
+  const chooseCity = () => { setPage('general'); setSkyOpen(false); setWeatherSearch(value => ({ ...value, editing: true })) }
   const { stage: stageStyle, bar: barStyle } = draft.appearance
   const mixedTransition = draft.ScheduleTransitionMinutes == null && new Set(draft.Schedule.map(point => point.TransitionMinutes)).size > 1
   const transitionMinutes = draft.ScheduleTransitionMinutes ?? draft.Schedule[0]?.TransitionMinutes ?? 30
@@ -80,7 +83,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
       <GlassStatus snapshot={snapshot} send={deviceSend} error="" sceneIds={{ morning: null, midday: null, dusk: null, night: null }} />
     </>}
     {page === 'schedule' && <>
-      <ScheduleChart active={open} settings={draft} snapshot={snapshot} onChange={points => change(s => { s.Schedule = points })} />
+      <ScheduleChart active={open} location={solarLocation} chooseCity={chooseCity} settings={draft} snapshot={snapshot} onChange={points => change(s => { s.Schedule = points; if (solarLocation && points.some(p => p.TimeKind === 'sunrise' || p.TimeKind === 'sunset')) s.SolarLocation = solarLocation })} />
       <div className="actions schedule-actions"><div className="schedule-enable"><label htmlFor="schedule">{t('自动渐变')}</label><Switch id="schedule" checked={draft.ScheduleEnabled} onCheckedChange={on => change(s => { s.ScheduleEnabled = on })} /></div><div className="global-transition"><input aria-label={t('渐变时长（分钟）')} type="number" min={0} max={1440} placeholder="—" value={mixedTransition ? '' : transitionMinutes} onChange={e => { const minutes = e.target.valueAsNumber; if (!Number.isInteger(minutes) || minutes < 0 || minutes > 1440) return; change(s => { s.ScheduleTransitionMinutes = minutes; s.Schedule.forEach(point => { point.TransitionMinutes = minutes }) }) }} /><span>{t('分钟')}</span></div></div>
     </>}
     {page === 'scenes' && <>
@@ -115,7 +118,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
       <div className="form-row"><label htmlFor="edge-brightness">{t('顶部滚轮调节亮度')}</label><Switch id="edge-brightness" checked={draft.TopEdgeBrightnessEnabled ?? false} onCheckedChange={on => change(s => { s.TopEdgeBrightnessEnabled = on })} /></div>
       <div className="form-row"><label htmlFor="edge-volume">{t('底部滚轮调节音量')}</label><Switch id="edge-volume" checked={draft.BottomEdgeVolumeEnabled ?? false} onCheckedChange={on => change(s => { s.BottomEdgeVolumeEnabled = on })} /></div>
       <div className="form-row"><label htmlFor="edge-modifier">{t('色温／应用音量按键')}</label><Select id="edge-modifier" value={draft.EdgeWheelModifier ?? 'alt'} onValueChange={value => change(s => { s.EdgeWheelModifier = value as EdgeWheelModifier })} options={[{ value: 'alt', label: 'Alt' }, { value: 'ctrl', label: 'Ctrl' }, { value: 'shift', label: 'Shift' }]} /></div>
-      <WeatherSettings active={open} searchDraft={weatherSearch} onSearchDraftChange={setWeatherSearch} value={draft.appearance.weather} onChange={weather => change(s => { s.appearance.weather = weather })} />
+      <WeatherSettings active={open} searchDraft={weatherSearch} onSearchDraftChange={setWeatherSearch} value={draft.appearance.weather} onChange={weather => change(s => { s.appearance.weather = weather; if (weather.city) s.SolarLocation = { Name: weather.city.name, Latitude: weather.city.latitude, Longitude: weather.city.longitude } })} />
       </div>
     </>}
     </div>}</Suspense>

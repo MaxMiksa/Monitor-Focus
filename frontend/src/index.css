@@ -238,7 +238,7 @@ input[type=number] { width: 104px; }
 .global-transition { display: flex; align-items: center; gap: 7px; }
 .settings-float .global-transition input { width: 58px; text-align: center; }
 
-.schedule-chart { position: relative; display: grid; grid-template-rows: minmax(0,1fr) 30px; padding: 22px 14px 26px; }
+.schedule-chart { position: relative; display: grid; grid-template-rows: 36px minmax(0,1fr) 30px; gap: 16px 0; padding: 0 14px 30px; }
 
 .schedule-time-axis { position: relative; height: 20px; margin-inline: 0; padding-top: 10px; font-size: var(--text-sm); line-height: 20px; font-variant-numeric: tabular-nums; }
 .schedule-time-axis > span { position: absolute; top: 10px; white-space: nowrap; }
@@ -334,9 +334,16 @@ input[type=number] { width: 104px; }
 .schedule-node-label[data-edge=end] { transform: translateX(-100%); }
 .schedule-node:hover .schedule-node-dot, .schedule-node:focus-visible .schedule-node-dot { box-shadow: 0 0 0 5px rgba(255,249,235,.25); }
 .schedule-feedback { position: absolute; bottom: 0; left: 14px; right: 14px; text-align: center; }
-.schedule-popover { width: 248px; display: grid; gap: 12px; padding: 16px; }
+.schedule-popover { width: 280px; display: grid; gap: 12px; padding: 16px; }
 .schedule-popover-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
 .schedule-popover-heading [data-slot=button] { width: 28px; min-height: 28px; padding: 4px; color: inherit; }
 .schedule-popover input { width: 100%; min-height: 36px; padding: 6px 12px; border: 1px solid rgba(255,249,235,.35); border-radius: 999px; color: #fff9eb; background: rgba(255,249,235,.06); color-scheme: dark; }
 .schedule-popover-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .schedule-popover-actions [data-slot=button] { color: inherit; border-color: rgba(255,249,235,.3); background: rgba(255,249,235,.06); min-height: 34px; }
+
+.schedule-solar-summary { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.schedule-solar-summary > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.schedule-solar-summary > [data-slot=button]:first-child { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: auto; }
+.schedule-solar-offset { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.schedule-solar-offset input { width: 76px; flex-shrink: 0; }
+.schedule-node-label { max-width: 180px; }

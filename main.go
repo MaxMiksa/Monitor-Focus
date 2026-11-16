@@ -9,6 +9,7 @@ import (
 	"log"
 	"monitorsfocus/internal/audio"
 	"monitorsfocus/internal/desktop"
+	"monitorsfocus/internal/domain"
 	"monitorsfocus/internal/startup"
 	"net/http"
 	"net/http/httputil"
@@ -37,11 +38,12 @@ var whiteIcon []byte
 var adoptedBuild string
 
 type Request struct {
-	Action   string
-	Id       string
-	Value    *float64
-	Settings map[string]any
-	TraceID  string `json:"-"`
+	SolarLocation *domain.SolarLocation `json:",omitempty"`
+	Action        string
+	Id            string
+	Value         *float64
+	Settings      map[string]any
+	TraceID       string `json:"-"`
 }
 type Message struct {
 	Id      string

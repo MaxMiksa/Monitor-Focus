@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"cmp"
 	"maps"
 	"slices"
 	"time"
@@ -17,6 +18,14 @@ type PlanResult struct {
 // EvaluatePlan expects validated settings and the host's local wall clock. It
 // inspects neighboring nodes only; startup/resume never replays missed frames.
 func EvaluatePlan(s Settings, now time.Time) *PlanResult {
+	var cache SolarCache
+	return evaluatePlan(s, now, &cache)
+}
+
+func evaluatePlan(s Settings, now time.Time, cache *SolarCache) *PlanResult {
+	if HasSolarPoints(s) {
+		return evaluateSolarPlan(s, now, cache)
+	}
 	if !s.ScheduleEnabled || len(s.Schedule) == 0 {
 		return nil
 	}
@@ -104,11 +113,22 @@ func (r PlanResult) Target(id string, origins map[string]DisplayTarget) (Display
 // SamePlanDefinition ignores list order, scene names and unrelated settings, so
 // saving a language/focus change or a reorder does not clear a manual hold.
 func SamePlanDefinition(a, b Settings) bool {
-	if a.ScheduleEnabled != b.ScheduleEnabled {
+	if a.ScheduleEnabled != b.ScheduleEnabled || (HasSolarPoints(a) || HasSolarPoints(b)) && !equalSolarLocation(a.SolarLocation, b.SolarLocation) {
 		return false
 	}
 	left, right := slices.Clone(a.Schedule), slices.Clone(b.Schedule)
-	compare := func(a, b PlanPoint) int { return a.MinuteOfDay - b.MinuteOfDay }
+	compare := func(a, b PlanPoint) int {
+		if n := cmp.Compare(a.TimeKind, b.TimeKind); n != 0 {
+			return n
+		}
+		if n := cmp.Compare(a.OffsetMinutes, b.OffsetMinutes); n != 0 {
+			return n
+		}
+		if n := cmp.Compare(a.MinuteOfDay, b.MinuteOfDay); n != 0 {
+			return n
+		}
+		return cmp.Compare(a.SceneId, b.SceneId)
+	}
 	slices.SortFunc(left, compare)
 	slices.SortFunc(right, compare)
 	if !slices.Equal(left, right) {
@@ -152,6 +172,7 @@ func equalIntPointer(a, b *int) bool {
 
 // ScheduleState is explicit per-host session state, never persisted in Settings.
 type ScheduleState struct {
+	Solar          SolarCache
 	ManualUntil    *time.Time
 	ActivePlanAt   *time.Time
 	TransitionFrom map[string]DisplayTarget
@@ -168,7 +189,7 @@ type ScheduleEvaluation struct {
 
 func HoldManual(s Settings, state ScheduleState, now time.Time) ScheduleState {
 	state.ManualUntil = nil
-	if p := EvaluatePlan(s, now); p != nil {
+	if p := evaluatePlan(s, now, &state.Solar); p != nil {
 		state.ManualUntil = clonePointer(&p.NextAt)
 	}
 	return state
@@ -185,7 +206,8 @@ func ReconcileSchedule(state ScheduleState, old, next Settings) ScheduleState {
 // targets become fade origins. After startup/sleep use canonical plan values.
 // Calls during a fade do not keep applying behavior or resetting focus timers.
 func EvaluateSchedule(s Settings, state ScheduleState, now time.Time, available []string, current map[string]DisplayTarget) (ScheduleEvaluation, error) {
-	r := ScheduleEvaluation{State: state, Settings: s.Clone(), Targets: CloneTargets(current), Plan: EvaluatePlan(s, now)}
+	r := ScheduleEvaluation{State: state, Settings: s.Clone(), Targets: CloneTargets(current)}
+	r.Plan = evaluatePlan(s, now, &r.State.Solar)
 	if r.Plan == nil {
 		return r, nil
 	}

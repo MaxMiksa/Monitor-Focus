@@ -27,7 +27,8 @@ type Settings struct {
 	KeepSecondaryAwakeOnFullscreen    bool
 	FocusDelaySeconds                 int
 	ScheduleEnabled                   bool
-	ScheduleTransitionMinutes         *int `json:",omitempty"`
+	SolarLocation                     *SolarLocation `json:",omitempty"`
+	ScheduleTransitionMinutes         *int           `json:",omitempty"`
 	LaunchOnStartup                   bool
 	TopEdgeBrightnessEnabled          bool
 	BottomEdgeVolumeEnabled           bool
@@ -56,6 +57,7 @@ type Snapshot struct {
 	Error          *string
 	Warning        *string
 	SystemLanguage *string
+	SolarTimes     *SolarTimes `json:",omitempty"`
 }
 
 type Request struct {
@@ -83,6 +85,8 @@ type SceneBehavior struct {
 	ControlledDisplayIds []string
 }
 type PlanPoint struct {
+	TimeKind          string `json:",omitempty"`
+	OffsetMinutes     int    `json:",omitempty"`
 	MinuteOfDay       int
 	SceneId           string
 	TransitionMinutes int
@@ -230,6 +234,7 @@ func SceneName(scene Scene, preference, systemLanguage string) string {
 // Clone makes an independent draft, including pointers and nil/empty selections.
 func (s Settings) Clone() Settings {
 	s.ScheduleTransitionMinutes = clonePointer(s.ScheduleTransitionMinutes)
+	s.SolarLocation = clonePointer(s.SolarLocation)
 	s.LinkWeights = maps.Clone(s.LinkWeights)
 	s.ControlledDisplayIds = slices.Clone(s.ControlledDisplayIds)
 	if s.BrightnessLinkCalibration != nil {

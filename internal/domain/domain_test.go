@@ -276,7 +276,7 @@ func planFixture() Settings {
 	s := DefaultSettings()
 	s.ScheduleEnabled = true
 	s.Scenes = []Scene{CaptureScene(s, "day", "Day", map[string]DisplayTarget{"a": {Brightness: 80}}), CaptureScene(s, "night", "Night", map[string]DisplayTarget{"a": {Brightness: 20, Kelvin: ptr(3200)}})}
-	s.Schedule = []PlanPoint{{8 * 60, "day", 30}, {23 * 60, "night", 120}}
+	s.Schedule = []PlanPoint{{MinuteOfDay: 8 * 60, SceneId: "day", TransitionMinutes: 30}, {MinuteOfDay: 23 * 60, SceneId: "night", TransitionMinutes: 120}}
 	return s
 }
 
@@ -317,7 +317,7 @@ func TestPlanMidnightNativeColorAndBoundaries(t *testing.T) {
 	if _, ok := p.Target("missing", nil); ok {
 		t.Fatal("missing device invented")
 	}
-	s.Schedule = []PlanPoint{{120, "day", 0}}
+	s.Schedule = []PlanPoint{{MinuteOfDay: 120, SceneId: "day", TransitionMinutes: 0}}
 	p = EvaluatePlan(s, localClock(2, 0, 0))
 	requireEqual(t, p.Progress, 1.0)
 	requireEqual(t, p.NextAt, localClock(2, 0, 0).AddDate(0, 0, 1))
@@ -460,7 +460,7 @@ func TestSceneAndPlanCalibratedSourcePrecedence(t *testing.T) {
 	}
 	requireEqual(t, targets["external"].Brightness, 98)
 	s.Scenes = []Scene{scene}
-	s.Schedule = []PlanPoint{{0, "matched", 0}}
+	s.Schedule = []PlanPoint{{MinuteOfDay: 0, SceneId: "matched", TransitionMinutes: 0}}
 	r, err := EvaluateSchedule(s, ScheduleState{}, localClock(12, 0, 0), []string{"external", "internal"}, current)
 	if err != nil {
 		t.Fatal(err)

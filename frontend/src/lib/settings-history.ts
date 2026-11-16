@@ -17,7 +17,7 @@ type History = { past: Draft[]; present: Draft; future: Draft[] }
 function settingsOf(draft: Draft): Settings {
   const { appearance, ...settings } = draft
   void appearance
-  return { ...settings, Schedule: draft.Schedule.map(({ key, ...point }) => { void key; return point }) }
+  return { ...settings, Schedule: draft.Schedule.map(({ key, ...point }) => { void key; return { ...point, TimeKind: point.TimeKind === 'fixed' ? undefined : point.TimeKind, OffsetMinutes: point.OffsetMinutes || undefined } }) }
 }
 function fingerprint(settings: Settings) {
   // Go and JS construct objects in different key orders (especially new scenes).

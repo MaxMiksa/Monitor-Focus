@@ -72,20 +72,42 @@ func Validate(s Settings) error {
 			}
 		}
 	}
+	if s.SolarLocation != nil {
+		if err := s.SolarLocation.Validate(); err != nil {
+			return err
+		}
+	}
+	solar := HasSolarPoints(s)
+	if solar && s.SolarLocation == nil {
+		return fmt.Errorf("solar schedule needs a city")
+	}
 	points := slices.Clone(s.Schedule)
 	slices.SortFunc(points, func(a, b PlanPoint) int { return a.MinuteOfDay - b.MinuteOfDay })
+	fixedTimes := map[int]bool{}
 	for i, p := range points {
+		if p.TimeKind != "" && p.TimeKind != "fixed" && p.TimeKind != "sunrise" && p.TimeKind != "sunset" {
+			return fmt.Errorf("invalid schedule time kind")
+		}
+		if p.OffsetMinutes < -720 || p.OffsetMinutes > 720 || (!p.IsSolar() && p.OffsetMinutes != 0) {
+			return fmt.Errorf("invalid solar offset")
+		}
+		if p.TransitionMinutes > 1440 {
+			return fmt.Errorf("invalid schedule transition")
+		}
 		if p.MinuteOfDay < 0 || p.MinuteOfDay >= 1440 || !ids[p.SceneId] || p.TransitionMinutes < 0 {
 			return fmt.Errorf("invalid schedule node")
 		}
-		if i > 0 && points[i-1].MinuteOfDay == p.MinuteOfDay {
+		if !p.IsSolar() && fixedTimes[p.MinuteOfDay] || !solar && i > 0 && points[i-1].MinuteOfDay == p.MinuteOfDay {
 			return fmt.Errorf("duplicate schedule time")
+		}
+		if !p.IsSolar() {
+			fixedTimes[p.MinuteOfDay] = true
 		}
 		gap := (points[(i+1)%len(points)].MinuteOfDay - p.MinuteOfDay + 1440) % 1440
 		if gap == 0 {
 			gap = 1440
 		}
-		if p.TransitionMinutes > gap {
+		if !solar && p.TransitionMinutes > gap {
 			return fmt.Errorf("transition overlaps the next node")
 		}
 	}

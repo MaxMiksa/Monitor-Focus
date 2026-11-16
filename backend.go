@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"monitorsfocus/internal/domain"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 type Backend struct {
+	solar  domain.SolarCache
 	mu     sync.Mutex
 	mode   string
 	state  map[string]any
@@ -45,6 +48,16 @@ func NewBackend(mode string, writes bool, root string) (*Backend, error) {
 func (b *Backend) Request(r Request) (map[string]any, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	// Pure, bounded astronomical preview: no hardware, writes or arbitrary URL.
+	if r.Action == "solar-times" {
+		if r.SolarLocation == nil {
+			return nil, errors.New("缺少城市")
+		}
+		if err := r.SolarLocation.Validate(); err != nil {
+			return nil, err
+		}
+		return map[string]any{"SolarTimes": b.solar.Today(r.SolarLocation, time.Now())}, nil
+	}
 	switch r.Action {
 	case "snapshot", "brightness", "temperature", "restore-color", "link", "scene", "pause", "resume-plan", "rescan", "save":
 	default:

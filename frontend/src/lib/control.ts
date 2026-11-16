@@ -3,13 +3,15 @@ export interface Display { Id: string; Name: string; Brightness: number; CanAdju
 export interface Target { Brightness: number; Kelvin: number | null }
 export interface SceneBehavior { Linked: boolean; LinkWeights: Record<string, number>; FocusEnabled: boolean; ControlledDisplayIds: string[] | null }
 export interface Scene { Id: string; Name: string; DefaultName?: string; Targets: Record<string, Target>; Behavior: SceneBehavior }
-export interface PlanPoint { MinuteOfDay: number; SceneId: string; TransitionMinutes: number }
+export interface SolarLocation { Name: string; Latitude: number; Longitude: number }
+export interface SolarTimes { Days: { Sunrise: string | null; Sunset: string | null }[]; Date: string; Location: SolarLocation; Sunrise: number | null; Sunset: number | null }
+export interface PlanPoint { TimeKind?: 'fixed' | 'sunrise' | 'sunset'; OffsetMinutes?: number; MinuteOfDay: number; SceneId: string; TransitionMinutes: number }
 export interface TemperatureBrightnessPoint { Kelvin: number; ReferenceBrightness: number; CompensatedBrightness: number }
 export interface BrightnessLinkCalibration { SourceId: string; TargetId: string; Points: { Source: number; Target: number }[] }
 export type EdgeWheelModifier = 'alt' | 'ctrl' | 'shift'
-export interface Settings extends SceneBehavior { SchemaVersion: number; Revision: number; Language: Language; KeepSecondaryAwakeOnFullscreen: boolean; FocusDelaySeconds: number; ScheduleEnabled: boolean; ScheduleTransitionMinutes?: number; LaunchOnStartup: boolean; TopEdgeBrightnessEnabled: boolean; BottomEdgeVolumeEnabled: boolean; EdgeWheelModifier: EdgeWheelModifier; Scenes: Scene[]; Schedule: PlanPoint[]; TemperatureBrightnessCalibrations?: Record<string, { Points: TemperatureBrightnessPoint[] }>; BrightnessLinkCalibration?: BrightnessLinkCalibration | null }
-export interface Snapshot { Displays: Display[]; Settings: Settings; FocusPaused: boolean; Source: string; Error: string | null; Warning?: string | null; SystemLanguage?: string | null }
-export interface Request { Action: string; Id?: string; Value?: number; Settings?: Settings }
+export interface Settings extends SceneBehavior { SolarLocation?: SolarLocation; SchemaVersion: number; Revision: number; Language: Language; KeepSecondaryAwakeOnFullscreen: boolean; FocusDelaySeconds: number; ScheduleEnabled: boolean; ScheduleTransitionMinutes?: number; LaunchOnStartup: boolean; TopEdgeBrightnessEnabled: boolean; BottomEdgeVolumeEnabled: boolean; EdgeWheelModifier: EdgeWheelModifier; Scenes: Scene[]; Schedule: PlanPoint[]; TemperatureBrightnessCalibrations?: Record<string, { Points: TemperatureBrightnessPoint[] }>; BrightnessLinkCalibration?: BrightnessLinkCalibration | null }
+export interface Snapshot { SolarTimes?: SolarTimes; Displays: Display[]; Settings: Settings; FocusPaused: boolean; Source: string; Error: string | null; Warning?: string | null; SystemLanguage?: string | null }
+export interface Request { SolarLocation?: SolarLocation; Action: string; Id?: string; Value?: number; Settings?: Settings }
 
 export function captureBehavior(settings: Settings): SceneBehavior {
   return structuredClone({ Linked: settings.Linked, LinkWeights: settings.LinkWeights,

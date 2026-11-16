@@ -347,5 +347,18 @@
   "时间点场景": "Scene",
   "删除时间点": "Delete time point",
   "时间点重复或渐变重叠，请调整时间或缩短渐变时长。": "Duplicate time or overlapping transition. Choose another time or shorten the transition.",
-  "确定": "Confirm"
+  "确定": "Confirm",
+  "选择城市": "Choose city",
+  "时间类型": "Time type",
+  "固定时间": "Fixed time",
+  "日出": "Sunrise",
+  "日落": "Sunset",
+  "当日不可用": "Unavailable today",
+  "提前／延后（分钟）": "Offset (minutes)",
+  "今日 {0}（本机时间）": "Today {0} (device time)",
+  "当日无此天文事件": "No solar event today",
+  "日出日落读取失败，请重新打开渐变页。": "Could not load solar times. Reopen the Schedule tab.",
+  "正在计算日出日落…": "Calculating solar times…",
+  "当天渐变已按节点间隔缩短；同分钟优先固定时间。": "Transitions shortened to fit today; fixed times take priority at the same minute.",
+  "同一分钟": "Same minute"
 }

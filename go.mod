@@ -5,6 +5,7 @@ go 1.27.3
 require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/go-ole/go-ole v1.3.0
+	github.com/nathan-osman/go-sunrise v1.1.0
 	github.com/wailsapp/wails/v3 v3.1.0
 	golang.org/x/sys v0.48.0
 )

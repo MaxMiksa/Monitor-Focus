@@ -2,8 +2,39 @@ package main
 
 import (
 	"encoding/json"
+	"monitorsfocus/internal/domain"
+	"os"
 	"testing"
 )
+
+func TestSolarTimesReadOnly(t *testing.T) {
+	b, err := NewBackend("mock", false, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := json.Marshal(b.state)
+	location := &domain.SolarLocation{Name: "深圳", Latitude: 22.53, Longitude: 114.06}
+	result, err := b.Request(Request{Action: "solar-times", SolarLocation: location})
+	if err != nil {
+		t.Fatal(err)
+	}
+	times, ok := result["SolarTimes"].(*domain.SolarTimes)
+	if !ok || times.Sunrise == nil || times.Sunset == nil {
+		t.Fatal("missing solar times")
+	}
+	for _, invalid := range []*domain.SolarLocation{nil, {Name: "invalid", Latitude: 91}} {
+		if _, err := b.Request(Request{Action: "solar-times", SolarLocation: invalid}); err == nil {
+			t.Fatal("invalid city accepted")
+		}
+	}
+	after, _ := json.Marshal(b.state)
+	if string(before) != string(after) {
+		t.Fatal("solar preview mutated settings or revision")
+	}
+	if _, err := os.Stat(b.path); !os.IsNotExist(err) {
+		t.Fatal("solar preview wrote settings")
+	}
+}
 
 func TestBridgeOriginBoundary(t *testing.T) {
 	for _, url := range []string{"http://wails.localhost.evil/", "http://wails.localhost:99/", "https://wails.localhost/", "http://user@wails.localhost/", "file:///C:/index.html"} {
