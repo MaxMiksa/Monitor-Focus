@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import { parseWeatherDetails, validWeatherDetails, weatherCodes, weatherDay } from './weather-details'
+import type { WeatherDetails } from './weather-details'
 
 export type WeatherCity = { id: number; name: string; detail: string; latitude: number; longitude: number }
 export type WeatherPreference = { enabled: boolean; city: WeatherCity | null }
@@ -7,10 +9,10 @@ const CACHE_KEY = 'monitors-focus.weather-current'
 const CHANGE = 'monitors-focus-weather'
 const REFRESH = 15 * 60_000
 const MAX_AGE = 30 * 60_000
-type Sample = { city: string; at: number; rain: number }
+type Sample = { city: string; at: number; rain: number; details?: WeatherDetails | null }
 type Status = 'off' | 'city' | 'loading' | 'rain' | 'dry' | 'error'
-type WeatherState = { rain: number; status: Status; updatedAt: number }
-let state: WeatherState = { rain: 0, status: 'off', updatedAt: 0 }
+export type WeatherState = { city: string | null; rain: number; status: Status; updatedAt: number; details: WeatherDetails | null }
+let state: WeatherState = { city: null, rain: 0, status: 'off', updatedAt: 0, details: null }
 const listeners = new Set<() => void>()
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
 const snapshot = () => state
@@ -123,23 +125,28 @@ function fresh(sample: Sample) { const age = Date.now() - sample.at; return age 
 function cached(city: WeatherCity): Sample | null {
   try {
     const value = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null') as Sample | null
-    return value && value.city === cityKey(city) && Number.isFinite(value.at) && Number.isFinite(value.rain)
-      && value.rain >= 0 && value.rain <= 1 && fresh(value) ? value : null
+    if (!value || value.city !== cityKey(city) || !Number.isFinite(value.at) || !Number.isFinite(value.rain)
+      || value.rain < 0 || value.rain > 1 || !fresh(value)) return null
+    return { ...value, details: validWeatherDetails(value.details) && value.details.dayEndsAt > Date.now()
+      && weatherDay(Date.now(), value.details.timezone) === value.details.day ? value.details : null }
   } catch { return null }
 }
 async function currentWeather(city: WeatherCity, signal: AbortSignal): Promise<Sample> {
   const url = new URL('https://api.open-meteo.com/v1/forecast')
-  url.search = new URLSearchParams({ latitude: String(city.latitude), longitude: String(city.longitude), current: 'rain,showers,weather_code', forecast_days: '1', timeformat: 'unixtime' }).toString()
+  url.search = new URLSearchParams({ latitude: String(city.latitude), longitude: String(city.longitude),
+    current: 'rain,showers,weather_code,temperature_2m,apparent_temperature,is_day', daily: 'temperature_2m_min,temperature_2m_max',
+    hourly: 'apparent_temperature,precipitation_probability,precipitation,weather_code,wind_gusts_10m',
+    timezone: 'auto', forecast_days: '2', forecast_hours: '4', wind_speed_unit: 'kmh', temperature_unit: 'celsius', timeformat: 'unixtime' }).toString()
   const data = await readJSON(url, signal) as { current?: { time?: number; rain?: number; showers?: number; weather_code?: number } }
   const current = data?.current
   if (!current || !Number.isFinite(current.time) || !Number.isFinite(current.rain) || !Number.isFinite(current.showers)
     || !Number.isInteger(current.weather_code) || current.rain! < 0 || current.showers! < 0) throw new Error('Invalid weather')
   const amount = current.rain! + current.showers!
   const code = current.weather_code!
-  if (![0, 1, 2, 3, 45, 48, 51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 71, 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99].includes(code)
+  if (!weatherCodes.includes(code)
     || !Number.isFinite(amount)) throw new Error('Invalid weather code')
   const rainy = amount > 0 || [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(code)
-  const sample = { city: cityKey(city), at: current.time! * 1000, rain: rainy ? Math.min(1, .35 + amount * .13) : 0 }
+  const sample = { city: cityKey(city), at: current.time! * 1000, rain: rainy ? Math.min(1, .35 + amount * .13) : 0, details: parseWeatherDetails(data) }
   if (!fresh(sample)) throw new Error('Outdated weather')
   return sample
 }
@@ -158,15 +165,16 @@ export function previewRain() {
 export function useRainPreview() { return useSyncExternalStore(subscribePreview, previewSnapshot) }
 
 // A single owner in ScenePanel. No Go timer, background polling or extra canvas.
-export function useWeatherRain(active: boolean) {
+export function useWeatherRain(active: boolean, showDetails = false) {
   const text = useSyncExternalStore(subscribePreference, preferenceText)
   const preference = useMemo(() => { void text; return readWeatherPreference() }, [text])
   const weather = useWeatherStatus()
   const previewing = useRainPreview()
+  const requested = active && preference.enabled || showDetails
   useEffect(() => {
     const city = preference.city
-    if (!active || !preference.enabled || !city) {
-      publish({ rain: 0, status: preference.enabled && !city ? 'city' : 'off', updatedAt: 0 })
+    if (!requested || !city) {
+      publish({ city: city ? cityKey(city) : null, rain: 0, status: requested && !city ? 'city' : 'off', updatedAt: 0, details: null })
       return
     }
     let sample = cached(city)
@@ -175,9 +183,10 @@ export function useWeatherRain(active: boolean) {
     function show(status?: Status) {
       window.clearTimeout(expiry)
       if (sample && fresh(sample)) {
-        publish({ rain: sample.rain, status: status ?? (sample.rain ? 'rain' : 'dry'), updatedAt: sample.at })
+        publish({ city: sample.city, rain: sample.rain, status: status ?? (sample.rain ? 'rain' : 'dry'), updatedAt: sample.at,
+          details: sample.details && sample.details.dayEndsAt > Date.now() ? sample.details : null })
         expiry = window.setTimeout(() => show('error'), Math.max(1, sample.at + MAX_AGE - Date.now()))
-      } else publish({ rain: 0, status: status ?? 'loading', updatedAt: 0 })
+      } else publish({ city: cityKey(city!), rain: 0, status: status ?? 'loading', updatedAt: 0, details: null })
     }
     async function refresh() {
       if (disposed || document.hidden || request) return
@@ -194,7 +203,9 @@ export function useWeatherRain(active: boolean) {
         if (!disposed && !controller.signal.aborted) show('error')
       } finally {
         request = null
-        if (!disposed && !document.hidden) next = window.setTimeout(() => void refresh(), controller.signal.aborted ? 0 : REFRESH)
+        const dayRemaining = (sample?.details?.dayEndsAt ?? Infinity) - Date.now()
+        if (!disposed && !document.hidden) next = window.setTimeout(() => void refresh(), controller.signal.aborted ? 0
+          : Math.max(100, Math.min(REFRESH, dayRemaining > 0 ? dayRemaining : REFRESH)))
       }
     }
     function visibility() {
@@ -212,11 +223,14 @@ export function useWeatherRain(active: boolean) {
       window.clearTimeout(expiry)
       document.removeEventListener('visibilitychange', visibility)
     }
-  }, [active, preference])
+  }, [requested, preference.city])
   useEffect(() => () => {
     window.clearTimeout(previewTimer)
     preview = false
     previewListeners.forEach(listener => listener())
   }, [active, preference.enabled])
-  return active ? (previewing ? .65 : weather.rain) : 0
+  const selected = preference.city ? cityKey(preference.city) : null
+  const matching = selected === weather.city
+  return { rain: active && preference.enabled ? (previewing ? .65 : matching ? weather.rain : 0) : 0,
+    city: preference.city, weather: matching ? weather : { city: selected, rain: 0, status: 'loading' as const, updatedAt: 0, details: null } }
 }

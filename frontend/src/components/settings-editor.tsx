@@ -23,7 +23,7 @@ import type { Display, EdgeWheelModifier, Settings, Snapshot } from '@/lib/contr
 const WeatherSettings = lazy(() => import('./weather-settings').then(module => ({ default: module.WeatherSettings })))
 const SkySettingsEditor = lazy(() => import('./sky-settings').then(module => ({ default: module.SkySettingsEditor })))
 
-export type SettingsEditorHandle = { flush: () => Promise<boolean> }
+export type SettingsEditorHandle = { flush: () => Promise<boolean>; chooseWeatherLocation: () => void }
 const tabs = ['displays', 'scenes', 'schedule', 'focus', 'general'] as const
 export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boolean; close: () => void; snapshot: Snapshot; send: Send; ref: Ref<SettingsEditorHandle> }) {
   const { progress, settingsOpacity, clipPath } = useSettingsMorph()
@@ -45,7 +45,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
   const { stage: stageStyle, bar: barStyle } = draft.appearance
   const mixedTransition = draft.ScheduleTransitionMinutes == null && new Set(draft.Schedule.map(point => point.TransitionMinutes)).size > 1
   const transitionMinutes = draft.ScheduleTransitionMinutes ?? draft.Schedule[0]?.TransitionMinutes ?? 30
-  useImperativeHandle(ref, () => ({ flush: () => flush() }), [flush])
+  useImperativeHandle(ref, () => ({ flush: () => flush(), chooseWeatherLocation: () => { setPage('general'); setSkyOpen(false); setWeatherSearch(value => ({ ...value, editing: true })) } }), [flush])
   useEffect(() => { setLanguage(draft.Language ?? 'system') }, [draft.Language, setLanguage])
   useEffect(() => {
     if (!open) return

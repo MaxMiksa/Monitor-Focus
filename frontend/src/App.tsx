@@ -35,6 +35,7 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(demo ? structuredClone(preview) : null)
   const [error, setError] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [weatherOpen, setWeatherOpen] = useState(false)
   const editor = useRef<SettingsEditorHandle>(null)
   const queue = useRef(Promise.resolve())
   const busy = useRef(0)
@@ -85,14 +86,15 @@ export default function App() {
       if (event.defaultPrevented || event.key !== 'Escape' || event.repeat || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
       if (document.querySelector('[data-slot=select-content]') || (event.target as HTMLElement | null)?.closest('[data-slot=select-content]')) return
       event.preventDefault()
+      if (weatherOpen) { setWeatherOpen(false); return }
       if (settingsOpen) { setSettingsOpen(false); return }
       void (async () => { if (!editor.current || await editor.current.flush()) windowCommand('window-close'); else setSettingsOpen(true) })()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [settingsOpen])
+  }, [settingsOpen, weatherOpen])
   return <MotionConfig reducedMotion="user"><SettingsMorph open={settingsOpen}><div className="scene-shell-root">
-    {!snapshot ? <div className="p-7"><h1>Monitors Focus</h1><p className="caption my-6">{message(error) || t('正在连接控制核心…')}</p><Button variant="outline" onClick={() => void send({ Action: 'snapshot' })}><RefreshCw />{t('重新连接')}</Button></div> : <ScenePanel snapshot={snapshot} send={sceneSend} error={error} demo={demo} settingsOpen={settingsOpen} openSettings={() => setSettingsOpen(true)}>
+    {!snapshot ? <div className="p-7"><h1>Monitors Focus</h1><p className="caption my-6">{message(error) || t('正在连接控制核心…')}</p><Button variant="outline" onClick={() => void send({ Action: 'snapshot' })}><RefreshCw />{t('重新连接')}</Button></div> : <ScenePanel snapshot={snapshot} send={sceneSend} error={error} demo={demo} settingsOpen={settingsOpen} weatherOpen={weatherOpen} setWeatherOpen={setWeatherOpen} openSettings={() => { setWeatherOpen(false); setSettingsOpen(true) }} chooseWeatherLocation={() => { editor.current?.chooseWeatherLocation(); setWeatherOpen(false); setSettingsOpen(true) }}>
       <SettingsEditor ref={editor} open={settingsOpen} close={() => setSettingsOpen(false)} snapshot={snapshot} send={send} />
     </ScenePanel>}
   </div></SettingsMorph></MotionConfig>

@@ -2,6 +2,8 @@
 
 ## 工程与环境
 
+首页天气卡片：`weather-panel.tsx` 按需加载、退出后卸载，使用本地彩色 SVG，无新增画布、轮询所有者或硬件动作；`App` 管理默认隐藏／Esc 优先级，首页导航保持设置／天气互斥并过滤按住 ↑ 的重复事件，地区入口复用通用设置。卡片与设置共用玻璃材质变量和字号。`weather-details.ts` 校验所选地点时区的今日最低／最高温及跨午夜未来三小时数据，规则生成建议；请求显式摄氏度／km/h，当前＋两天日界＋四个小时数据由原天气所有者一次读取，未来字段缺失则不给建议，不用全市坐标或旧日期数据凑数。仍兼容旧雨缓存；跨日触发刷新，失败回到正常重试间隔，不热循环；停用雨景且收起卡片时取消请求／清理计时。`build/diagnostics/weather-panel/` 保存确认布局、实时 API 样本、八项规则和浏览器验收、1024 DIP 英文／减少动态效果／旧舞台截图、原生 WebView2＋模拟核心键盘验收及正式构建日志；天气画面使用测试数据，不是南山实况。部署见 `build/diagnostics/weather-panel-20261116-update.json`；原生改动隔离沿用 `weather-location/native-source/source-overlay.json`，未加入其他任务的原生／原型页改动。
+
 天气位置：`frontend/src/lib/weather.ts` 保持原 `WeatherCity` 本地存储结构，搜索结果补全所属城市和层级；无匹配时对中文区县后缀及组合名做有界回退，组合名必须匹配返回行政层级，仍须用户显式选择。缓存键含地点 ID 与经纬度，换区县不复用全市天气；不改天气轮询、桥权限或硬件配置。`build/diagnostics/weather-location/` 保存实时地名响应、六种查询与取消／旧偏好兼容检查、正式前端真实地名搜索／坐标切换／撤销／重做／重载验收和构建日志；天气响应为测试专用晴天，不代表南山实况。正式构建用同目录 `native-source/source-overlay.json` 隔离其他未提交原生改动，未包含原型页；部署见 `build/diagnostics/weather-location-20261116-update.json`。
 
 单一 Go 工程：根目录 `*.go`、`go.mod`、`go.sum` 是 Wails 宿主；`internal/` 是原生适配与纯规则；`frontend/` 是 React/TypeScript 界面；`scripts/` 是构建、开发、部署与诊断入口；`calibrations/` 保存个人设备匹配数据；`build/` 只放可重建产物和诊断记录，不是源码。

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Sunrise, Sun, Sunset, Moon, Settings2, SlidersHorizontal, Monitor, Laptop, Link2, Unlink2, Pause, Play, RotateCcw, RefreshCw, Thermometer, X, AlertCircle, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,8 @@ import { useSettingsMorph } from '@/components/settings-morph-context'
 import { SKY_PREVIEW_EVENT, skyScenes } from '@/lib/sky-preference'
 import type { Display, Snapshot } from '@/lib/control'
 import type { Send } from '@/App'
+
+const WeatherPanel = lazy(() => import('./weather-panel').then(module => ({ default: module.WeatherPanel })))
 
 type SceneKey = 'morning' | 'midday' | 'dusk' | 'night'
 export type StageKey = SceneKey
@@ -115,7 +117,7 @@ export function GlassStatus({ snapshot, error, send, close, sceneIds, embedded =
   </div>
 }
 
-export function ScenePanel({ snapshot, send, error, openSettings, demo, settingsOpen, children }: { snapshot: Snapshot; send: Send; error: string; openSettings: () => void; demo: boolean; settingsOpen: boolean; children: ReactNode }) {
+export function ScenePanel({ snapshot, send, error, openSettings, demo, settingsOpen, weatherOpen, setWeatherOpen, chooseWeatherLocation, children }: { snapshot: Snapshot; send: Send; error: string; openSettings: () => void; demo: boolean; settingsOpen: boolean; weatherOpen: boolean; setWeatherOpen: (open: boolean) => void; chooseWeatherLocation: () => void; children: ReactNode }) {
   const { capsuleOpacity } = useSettingsMorph()
   const { t } = useI18n()
   const reduced = useReducedMotion()
@@ -131,7 +133,7 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
     return () => window.removeEventListener(SKY_PREVIEW_EVENT, listener)
   }, [])
   const live = style === 'live' || (settingsOpen && skyPreview !== null)
-  const rain = useWeatherRain(live)
+  const { rain, weather, city } = useWeatherRain(live, weatherOpen && !settingsOpen)
   const fullBarOpen = !live && !settingsOpen
   const ids = useMemo(() => inferSceneKeys(snapshot), [snapshot])
   const sourceScene = useMemo(() => inferSceneFromSource(snapshot, ids), [snapshot, ids])
@@ -210,7 +212,7 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null
-      if (settingsOpen || event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || target?.closest('input, select, textarea, [role=slider], [contenteditable=true]')) return
+      if (settingsOpen || event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || target?.closest('input, select, textarea, [role=slider], [role=switch], [role=combobox], [role=option], [contenteditable=true]')) return
       {
         const index = sceneKeys.indexOf(syncedScene.current)
         if (['ArrowLeft', 'ArrowRight', 'a', 'A', 'd', 'D'].includes(event.key)) {
@@ -218,19 +220,20 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
           change(sceneKeys[(index + (['ArrowRight', 'd', 'D'].includes(event.key) ? 1 : -1) + sceneKeys.length) % sceneKeys.length])
           return
         }
-        if (['ArrowUp', 'w', 'W'].includes(event.key)) { event.preventDefault(); openSettings(); return }
+        if (['ArrowDown', 's', 'S'].includes(event.key)) { event.preventDefault(); if (!event.repeat) setWeatherOpen(true); return }
+        if (['ArrowUp', 'w', 'W'].includes(event.key)) { event.preventDefault(); if (!event.repeat) { if (weatherOpen) setWeatherOpen(false); else openSettings() } return }
       }
       const index = Number(event.key) - 1
       if (index >= 0 && index < sceneKeys.length) change(sceneKeys[index])
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [change, settingsOpen, openSettings])
+  }, [change, settingsOpen, openSettings, weatherOpen, setWeatherOpen])
 
   const displays = snapshot.Displays.slice(0, 2)
   const visibleStage = settingsOpen && skyPreview ? skyPreview : stage
   const caption = stageNames[visibleStage]
-  return <div className="scene-shell" data-scene={visibleStage} data-stage={live ? 'live' : 'classic'} data-settings-open={settingsOpen} data-raining={rain > 0}>
+  return <div className="scene-shell" data-scene={visibleStage} data-stage={live ? 'live' : 'classic'} data-settings-open={settingsOpen} data-weather-open={weatherOpen && !settingsOpen} data-raining={rain > 0}>
     <div className="scene-backdrop" aria-hidden="true">
       {live ? <><LiveSceneStage key="live" scene={visibleStage} reduced={!!reduced} /><SkyEffects scene={visibleStage} reduced={!!reduced} /><RainAtmosphere rain={rain} scene={visibleStage} /></> : (Object.keys(sceneAssets) as StageKey[]).map(key => <div key={key} className="scene-image" data-active={stage === key} style={{ backgroundImage: `url('${sceneAssets[key]}')` }} />)}
     </div>
@@ -284,6 +287,7 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
     </motion.section>
 
     <AnimatePresence>{more && fullBarOpen && <motion.div className={`glass-more${live ? ' glass-more-live' : ''}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: .18 }}><GlassStatus snapshot={snapshot} error={error} send={send} sceneIds={ids} close={() => setMore(false)} /></motion.div>}</AnimatePresence>
+    {!settingsOpen && <AnimatePresence initial={false}>{weatherOpen && <Suspense key="weather" fallback={null}><WeatherPanel city={city} weather={weather} reduced={!!reduced} chooseLocation={chooseWeatherLocation} /></Suspense>}</AnimatePresence>}
     {children}
     <SettingsMorphSurface anchorKey={`${live}-${barStyle}`} />
     {live && <WeatherRainOverlay rain={rain} reduced={!!reduced} settingsOpen={settingsOpen} />}

@@ -23,8 +23,8 @@ export function WeatherSettings({ value, live, active = true, searchDraft, onSea
   const request = useRef<AbortController | null>(null)
   useEffect(() => () => request.current?.abort(), [])
   useEffect(() => {
-    if (!value.enabled || !active) request.current?.abort()
-  }, [value.enabled, active])
+    if (!active) request.current?.abort()
+  }, [active])
   async function search() {
     request.current?.abort()
     const controller = new AbortController()
@@ -52,15 +52,13 @@ export function WeatherSettings({ value, live, active = true, searchDraft, onSea
       : weather.status === 'rain' ? t('当前有雨') : weather.status === 'dry' ? t('当前无雨') : t('选择位置后跟随天气')
   return <div className="weather-settings">
     <div className="form-row"><label htmlFor="weather-enabled">{t('天气雨景')}</label><Switch id="weather-enabled" checked={value.enabled} onCheckedChange={enabled => onChange({ ...value, enabled })} /></div>
-    {value.enabled && <>
       <div className="form-row weather-city-row"><label>{t('天气位置')}</label><Button variant="outline" title={value.city ? `${value.city.name} · ${value.city.detail}` : undefined} onClick={() => { request.current?.abort(); changeSearch({ editing: !editing, query: '' }); setResults([]); setSearchState('idle') }}>{value.city?.name ?? t('选择位置')}</Button></div>
       {editing && <div className="weather-city-search">
         <div className="weather-search-input"><input aria-label={t('搜索城市或区县')} placeholder={t('城市、区县或拼音')} maxLength={80} value={query} onChange={event => { request.current?.abort(); changeSearch({ editing, query: event.target.value }); setResults([]); setSearchState('idle') }} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing && query.trim().length >= 2) { event.preventDefault(); void search() } }} /><Button variant="ghost" size="icon" aria-label={t('搜索城市或区县')} disabled={query.trim().length < 2 || searchState === 'loading'} onClick={() => void search()}><Search /></Button></div>
         {results.length > 0 && <Select aria-label={t('选择搜索结果')} value="choose" onValueChange={id => { const city = results.find(item => String(item.id) === id); if (city) { onChange({ ...value, city }); changeSearch({ editing: false, query }); setResults([]) } }} options={[{ value: 'choose', label: t('选择搜索结果'), disabled: true }, ...results.map(city => ({ value: String(city.id), label: `${city.name} · ${city.detail}` }))]} />}
         {searchState !== 'idle' && <p role="status">{searchState === 'loading' ? t('正在搜索…') : searchState === 'empty' ? t('未找到地点，请尝试区县名、拼音或英文') : t('地点搜索失败，请重试')}</p>}
       </div>}
-      <div className="weather-state-row"><span role="status">{status}</span><Button variant="ghost" size="icon" aria-label={previewing ? t('停止雨景预览') : t('预览雨景')} title={previewing ? t('停止雨景预览') : t('预览雨景')} aria-pressed={previewing} disabled={!live} onClick={previewRain}><CloudRain /></Button></div>
+      {value.enabled && <div className="weather-state-row"><span role="status">{status}</span><Button variant="ghost" size="icon" aria-label={previewing ? t('停止雨景预览') : t('预览雨景')} title={previewing ? t('停止雨景预览') : t('预览雨景')} aria-pressed={previewing} disabled={!live} onClick={previewRain}><CloudRain /></Button></div>}
       <a className="weather-source" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">{t('天气数据：Open-Meteo')}</a>
-    </>}
   </div>
 }
