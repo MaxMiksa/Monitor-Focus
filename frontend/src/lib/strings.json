@@ -290,6 +290,8 @@
   "停止雨景预览": "Stop rain preview",
   "预览雨景": "Preview rain",
   "天气数据：Open-Meteo": "Weather: Open-Meteo",
+  "天气数据：Open-Meteo（备用）": "Weather: Open-Meteo (fallback)",
+  "天气数据：UAPI": "Weather: UAPI",
   "云彩分布": "Cloud placement",
   "原有分布": "Original placement",
   "自然散布": "Natural scatter",

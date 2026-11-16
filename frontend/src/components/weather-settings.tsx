@@ -59,6 +59,6 @@ export function WeatherSettings({ value, active = true, searchDraft, onSearchDra
         {searchState !== 'idle' && <p role="status">{searchState === 'loading' ? t('正在搜索…') : searchState === 'empty' ? t('未找到地点，请尝试区县名、拼音或英文') : t('地点搜索失败，请重试')}</p>}
       </div>}
       {value.enabled && <div className="weather-state-row"><span role="status">{status}</span><Button variant="ghost" size="icon" aria-label={previewing ? t('停止雨景预览') : t('预览雨景')} title={previewing ? t('停止雨景预览') : t('预览雨景')} aria-pressed={previewing} onClick={previewRain}><CloudRain /></Button></div>}
-      <a className="weather-source" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">{t('天气数据：Open-Meteo')}</a>
+      <a className="weather-source" href={weather.source === 'open-meteo' ? 'https://open-meteo.com/' : 'https://uapis.cn/docs/api-reference/get-misc-weather'} target="_blank" rel="noopener noreferrer">{weather.source === 'open-meteo' ? t('天气数据：Open-Meteo（备用）') : t('天气数据：UAPI')}</a>
   </div>
 }

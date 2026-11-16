@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import { parseWeatherDetails, validWeatherDetails, weatherCodes, weatherDay } from './weather-details'
 import type { WeatherDetails } from './weather-details'
+import { domesticQuery, parseDomesticWeather } from './weather-domestic'
 
 export type WeatherCity = { id: number; name: string; detail: string; latitude: number; longitude: number }
 export type WeatherPreference = { enabled: boolean; city: WeatherCity | null }
 export const WEATHER_KEY = 'monitors-focus.weather'
-const CACHE_KEY = 'monitors-focus.weather-current'
+const CACHE_KEY = 'monitors-focus.weather-current-v2'
 const CHANGE = 'monitors-focus-weather'
 const REFRESH = 15 * 60_000
 const MAX_AGE = 30 * 60_000
-type Sample = { city: string; at: number; rain: number; details?: WeatherDetails | null }
+type Sample = { city: string; at: number; rain: number; source: 'uapi' | 'open-meteo'; details?: WeatherDetails | null }
 type Status = 'off' | 'city' | 'loading' | 'rain' | 'dry' | 'error'
-export type WeatherState = { city: string | null; rain: number; status: Status; updatedAt: number; details: WeatherDetails | null }
+export type WeatherState = { city: string | null; rain: number; status: Status; updatedAt: number; details: WeatherDetails | null; source?: Sample['source'] }
 let state: WeatherState = { city: null, rain: 0, status: 'off', updatedAt: 0, details: null }
 const listeners = new Set<() => void>()
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
@@ -46,7 +47,7 @@ function subscribePreference(listener: () => void) {
   return () => { window.removeEventListener(CHANGE, listener); window.removeEventListener('storage', listener) }
 }
 
-// Both endpoints are fixed and separately allowed by the production CSP.
+// All endpoints are fixed and separately allowed by the production CSP.
 async function readJSON(url: URL, parent: AbortSignal): Promise<unknown> {
   const controller = new AbortController()
   const abort = () => controller.abort()
@@ -125,13 +126,26 @@ function fresh(sample: Sample) { const age = Date.now() - sample.at; return age 
 function cached(city: WeatherCity): Sample | null {
   try {
     const value = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null') as Sample | null
-    if (!value || value.city !== cityKey(city) || !Number.isFinite(value.at) || !Number.isFinite(value.rain)
+    if (!value || !['uapi', 'open-meteo'].includes(value.source) || value.city !== cityKey(city) || !Number.isFinite(value.at) || !Number.isFinite(value.rain)
       || value.rain < 0 || value.rain > 1 || !fresh(value)) return null
     return { ...value, details: validWeatherDetails(value.details) && value.details.dayEndsAt > Date.now()
       && weatherDay(Date.now(), value.details.timezone) === value.details.day ? value.details : null }
   } catch { return null }
 }
 async function currentWeather(city: WeatherCity, signal: AbortSignal): Promise<Sample> {
+  const query = domesticQuery(city)
+  if (query) {
+    try {
+      const domestic = new URL('https://uapis.cn/api/v1/misc/weather')
+      domestic.search = new URLSearchParams({ city: query, extended: 'true', forecast: 'true', hourly: 'true' }).toString()
+      const data = await readJSON(domestic, signal)
+      signal.throwIfAborted()
+      return { ...parseDomesticWeather(data, city), city: cityKey(city), source: 'uapi' }
+    } catch {
+      // A cancelled panel must not start a fallback request.
+      signal.throwIfAborted()
+    }
+  }
   const url = new URL('https://api.open-meteo.com/v1/forecast')
   url.search = new URLSearchParams({ latitude: String(city.latitude), longitude: String(city.longitude),
     current: 'rain,showers,weather_code,temperature_2m,apparent_temperature,is_day', daily: 'temperature_2m_min,temperature_2m_max',
@@ -146,7 +160,7 @@ async function currentWeather(city: WeatherCity, signal: AbortSignal): Promise<S
   if (!weatherCodes.includes(code)
     || !Number.isFinite(amount)) throw new Error('Invalid weather code')
   const rainy = amount > 0 || [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(code)
-  const sample = { city: cityKey(city), at: current.time! * 1000, rain: rainy ? Math.min(1, .35 + amount * .13) : 0, details: parseWeatherDetails(data) }
+  const sample: Sample = { city: cityKey(city), at: current.time! * 1000, rain: rainy ? Math.min(1, .35 + amount * .13) : 0, details: parseWeatherDetails(data), source: 'open-meteo' }
   if (!fresh(sample)) throw new Error('Outdated weather')
   return sample
 }
@@ -183,7 +197,7 @@ export function useWeatherRain(active: boolean, showDetails = false) {
     function show(status?: Status) {
       window.clearTimeout(expiry)
       if (sample && fresh(sample)) {
-        publish({ city: sample.city, rain: sample.rain, status: status ?? (sample.rain ? 'rain' : 'dry'), updatedAt: sample.at,
+        publish({ city: sample.city, rain: sample.rain, status: status ?? (sample.rain ? 'rain' : 'dry'), updatedAt: sample.at, source: sample.source,
           details: sample.details && sample.details.dayEndsAt > Date.now() ? sample.details : null })
         expiry = window.setTimeout(() => show('error'), Math.max(1, sample.at + MAX_AGE - Date.now()))
       } else publish({ city: cityKey(city!), rain: 0, status: status ?? 'loading', updatedAt: 0, details: null })

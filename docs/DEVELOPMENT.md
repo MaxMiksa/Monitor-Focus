@@ -2,6 +2,8 @@
 
 ## 工程与环境
 
+国内天气：`weather-domestic.ts` 适配固定 `https://uapis.cn/api/v1/misc/weather`，无需账号／密钥，中文地区名和原偏好行政层级必须匹配响应；缺字段／未知天气／过期／跨日预报不接受并自动按原坐标回退 Open-Meteo。当前雨景与未来三小时建议独立；缺少阵风读数保留 `null`，不拿普通风速冒充阵风。缓存使用带来源的 `weather-current-v2`，旧天气缓存不再读取，其他偏好与共享缓存不清空。设置原来源链接随实际来源切换并标注备用。`node --experimental-vm-modules scripts/Test-WeatherSource.mjs` 验证当前多云／未来雨的隔离、实雨、地区／日期／时效／未知值拒绝、缺失建议、首选／回退和取消；加 `--live` 读取真实南山天气。`build/diagnostics/weather-domestic/` 保存真实响应与验证、正式构建日志；生产 Origin 的跨域响应许可已核对，真实适配结果为多云／28°C／雨景 0。正式构建／lint、Go test／vet／PE 检查通过；部署见 `weather-domestic-20261116-update.json`，保持目标、专注与唯一自启。未证明长期稳定或所有地区覆盖，未重复原生截图；构建沿用 `weather-location/native-source/source-overlay.json` 隔离其他在途原生修改。
+
 天气视觉还原以 `weather-panel/approved-layout.png` 为准，将原图 1672px 画面换算至正式 1168 DIP 客户区：外框 958×157、左 105／顶 31、地区分隔线约 x864；42px 当前温度、26px 天气／温差、20px 建议，56px 彩色 SVG，建议随内容排列而非等分拉开。地区两行居中、右对齐；复用玻璃材质与字体，增强细描边并减轻外阴影，不影响其他组件字号。`build/diagnostics/weather-fidelity/` 保存真实 React 首页的同场景截图与尺寸核对；天气为隔离预览的 24°C／20–26°C 样本，非南山实况。英文长建议自然换行，不截断。此轮不改请求、位置偏好或按键逻辑。正式构建／lint、Go test／vet 与 PE 检查通过；部署证据为 `weather-fidelity-20261116-update.json`，保持硬件目标、专注和唯一自启；未重复长期／原生截图验收。
 
 统一首页：`scene-panel.tsx` 仅有新版胶囊与设置入口，背景选择不再分叉控件、天空预览或天气能力；双机器只复用原四图与交叉淡入。`stage-preference.ts` 首次读取将旧 `monitors-focus.stage-style` 迁移至 `monitors-focus.background-style`，仅在新键不存在时继承选择，写入成功后删除旧键，不清空共享偏好／缓存。`wind-rain-runtime.js` 复用同一个雨画布与粒子上限，以底图原尺寸的 cover 投影计算单／双机器斜边交点，背景改变清掉旧水花并重算投影；双机器天空使用轻量 SVG 遮罩。`build/diagnostics/background-unification/` 保留正式构建日志、样式／偏好迁移／双机器命中／开关释放验收和截图，天气是测试数据；部署见 `background-unification-20261116-update.json`。原生构建沿用 `weather-location/native-source/source-overlay.json` 隔离在途硬件修改，未包含原型页修改；未验收长期运行。
@@ -112,7 +114,7 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 雨丝连续经过机顶源图 y=378、x=722–945 时产生短促水珠与少量短弧，不改变雨滴轨迹／寿命。真实 `.settings-morph-surface` 与收起提示的上缘按每帧矩形定位，跟随连续形变；雨层位于控件之上且点击穿透。设置展开同步清除并关闭机顶水花，收起恢复；外框溅落保留。氛围由背景内静态渐变实现，不加模糊／纹理／计时器；`rain-appearance.ts` 共用雨量曲线，小雨透明度趋零、最大雨量保持，夜景减轻压暗。
 
-天气请求：`weather.ts` 仅请求固定 HTTPS `api.open-meteo.com`／`geocoding-api.open-meteo.com`，生产 CSP 仅允许这些天气来源；不经过硬件队列、不增加 Go 后台轮询。请求 10 秒超时、64 KiB 响应上限、禁凭据／跳转，并校验城市坐标、天气字段／代码／时间；15 分钟刷新，30 分钟缓存到期停雨，隐藏取消请求，卸载取消定时器。`weather-settings.tsx` 负责搜索／选择与 30 秒预览，偏好纳入撤销历史；降雨量沿用现有天气强度映射，不改变硬件目标。
+天气请求：`weather.ts` 仅请求固定 HTTPS `uapis.cn`／`api.open-meteo.com`／`geocoding-api.open-meteo.com`，生产 CSP 仅允许这些天气来源；不经过硬件队列、不增加 Go 后台轮询。每次请求 10 秒超时、64 KiB 响应上限、禁凭据／跳转，并校验地区、天气字段／代码／时间；国内来源失败才回退，取消不发起备用请求。15 分钟刷新，30 分钟缓存到期停雨，隐藏取消请求，卸载取消定时器。`weather-settings.tsx` 负责搜索／选择与 30 秒预览，偏好纳入撤销历史；不改变硬件目标。
 
 浏览器选型：`scripts/rain-preview/` 中运行 `npm ci --ignore-scripts`、`npm run build:ui`、`npm start`，访问 `http://127.0.0.1:5194`。六款配置仅用于比较；斜风雨 re-export 正式运行时。默认「实际界面」通过只读模拟桥复用实际设置／胶囊组件，不调用硬件；预览生成到 `build/rain-ui-preview`，不进入正式 exe。`/product/?preview=1` 使用 `frontend/dist` 检查真实正式资源；生产环境不提供此开发服务。零雨量、暂停、开关、视口变化与切换销毁已验证。
 

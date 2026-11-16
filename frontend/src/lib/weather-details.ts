@@ -1,7 +1,7 @@
 import type { TextKey } from './i18n'
 
 export const weatherCodes = [0, 1, 2, 3, 45, 48, 51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 71, 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99]
-type Outlook = { low: number; high: number; probability: number; precipitation: number; gust: number; codes: number[] }
+type Outlook = { low: number; high: number; probability: number; precipitation: number; gust: number | null; codes: number[] }
 export type WeatherDetails = { temperature: number; apparent: number; minimum: number; maximum: number; code: number; isDay: boolean; timezone: string; day: string; dayEndsAt: number; outlook: Outlook | null }
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
 const temperature = (value: unknown): value is number => finite(value) && value >= -100 && value <= 100
@@ -17,7 +17,7 @@ export function validWeatherDetails(value: unknown): value is WeatherDetails {
     && typeof details.isDay === 'boolean' && typeof details.timezone === 'string' && typeof details.day === 'string' && finite(details.dayEndsAt)
     && (details.outlook === null || (temperature(outlook.low) && temperature(outlook.high) && outlook.low <= outlook.high
       && finite(outlook.probability) && outlook.probability >= 0 && outlook.probability <= 100
-      && finite(outlook.precipitation) && outlook.precipitation >= 0 && finite(outlook.gust) && outlook.gust >= 0
+      && finite(outlook.precipitation) && outlook.precipitation >= 0 && (outlook.gust === null || finite(outlook.gust) && outlook.gust >= 0)
       && Array.isArray(outlook.codes) && outlook.codes.length >= 1 && outlook.codes.length <= 5 && outlook.codes.every(code => weatherCodes.includes(code))))
 }
 export function parseWeatherDetails(value: unknown): WeatherDetails | null {
@@ -81,7 +81,7 @@ export function travelAdvice(details: WeatherDetails): TextKey {
   const { codes, gust, precipitation, probability, high } = details.outlook
   if (codes.some(code => code >= 95)) return '有雷雨，尽量减少户外活动'
   if (codes.some(code => [56, 57, 66, 67, 71, 73, 75, 77, 85, 86].includes(code))) return '雨雪路滑，出行留意'
-  if (gust >= 50) return '阵风较强，出行注意防风'
+  if (gust !== null && gust >= 50) return '阵风较强，出行注意防风'
   if (codes.some(code => code === 45 || code === 48)) return '有雾，出行注意慢行'
   if (precipitation >= 1 || probability >= 50 || codes.some(code => code >= 51 && code <= 82)) return '未来几小时有雨，记得带伞'
   if (probability >= 25 || precipitation > .1) return '可能有零星雨，随身备伞'
