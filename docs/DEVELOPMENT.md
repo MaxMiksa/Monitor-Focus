@@ -136,6 +136,8 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 星星闪烁：star-twinkle.ts 仅适配pmndrs星点材质，初始化一次逐星相位／频率／幅度属性；取消默认共享尺寸脉冲，用独立明暗曲线保留星点形状。每帧只更新时间，闪烁滑条控制强度，0和减少动态效果常亮。云彩与旧版薄云不改。设置收起修正：clipPath完成收拢后才淡出，天空编辑内容不因open=false提前换页，关闭期间inert与pointer-events禁止操作。
 
+蒲公英移动范围：`live-scene-stage.tsx` 的水平／竖直振幅均为原来两倍，共享相位周期由 120 秒延长至 240 秒，保持各朵瞬时漂移速度与四场景连续相位，不增加资源或修改其他天空效果。正式构建／lint、Go test／vet、PE 检查见 `build/diagnostics/seed-range-build.log`；部署及保留包证据见 `seed-range-20261116-update.json`／`seed-range-20261116-retention.json`，保持显示目标、专注与唯一自启。未重复原生画面或长期验收。
+
 ## 连续场景过渡
 
 设置页／场景栏共用 `settings-morph.tsx` 的空玻璃外框，Motion 阻尼弹簧保留反向时速度；上下文仅共享进度与两端矩形，ResizeObserver 随窗口／栏宽更新锚点。外框位置、尺寸、圆角、材质及阴影随同一进度插值；设置内容不缩放，仅裁切／淡入淡出；场景内容在最后 3.5% 形变中交接。保持设置挂载和草稿，立即切换 inert，不依赖延时定时器；无截图／画布／纹理缓存，卸载释放观察器。系统减少动态效果时直接跳至终态。逐帧证据 `build/diagnostics/settings-morph/frames.json` 覆盖开关、90ms 间隔五次反向、图标／图文胶囊，验证无两组内容重叠、外框有界及文字 transform 为 none；未实测系统减少动态效果与长期占用。

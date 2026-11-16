@@ -259,8 +259,8 @@ function draw(runtime: StageRuntime, progress: number, capture = false) {
     // Evaluate once per seed per draw, rather than for every sky pixel.
     const seedPhase = capture ? runtime.presentedSeedPhase : runtime.seedPhase
     runtime.seedOffsets[index * 2] = (Math.sin(seedPhase * speed + phase) - Math.sin(phase))
-      * (17 + index % 4 * 2) + Math.sin(seedPhase * 2) * 8
-    runtime.seedOffsets[index * 2 + 1] = (Math.sin(seedPhase * (speed + 1) + phase * .7) - Math.sin(phase * .7)) * 3
+      * (34 + index % 4 * 4) + Math.sin(seedPhase * 2) * 16
+    runtime.seedOffsets[index * 2 + 1] = (Math.sin(seedPhase * (speed + 1) + phase * .7) - Math.sin(phase * .7)) * 6
   }
   gl.uniform2fv(uniforms.seedOffsets, runtime.seedOffsets)
   gl.uniform1f(uniforms.progress, progress)
@@ -469,7 +469,8 @@ function tickAir(runtime: StageRuntime, signal: AbortSignal, now: number) {
   if (signal.aborted || idlePaused(runtime)) { runtime.animation = 0; return }
   const delta = Math.min((now - runtime.lastTick) / 1000, .2)
   runtime.lastTick = now
-  runtime.seedPhase = (runtime.seedPhase + delta * TAU / 120) % TAU
+  // Twice the travel and period preserve the original gentle drift speed.
+  runtime.seedPhase = (runtime.seedPhase + delta * TAU / 240) % TAU
   // Both layer speeds make an integer number of grid cells in 1000 seconds.
   runtime.rainTime = (runtime.rainTime + delta) % 1000
   const interval = 1000 / Math.min(MAX_FPS, runtime.running ? MAX_FPS : runtime.rain > 0 ? 24 : AIR_PROFILES[runtime.scene].idleFps)
