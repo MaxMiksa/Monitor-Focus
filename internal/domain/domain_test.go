@@ -483,3 +483,21 @@ func TestValidationRejectsBadRules(t *testing.T) {
 		}
 	}
 }
+
+// Measure a regular tick after a node's behavior has already been applied.
+func BenchmarkScheduleSteadyTick(b *testing.B) {
+	s := planFixture()
+	now := localClock(12, 0, 0)
+	ids := []string{"a"}
+	targets := map[string]DisplayTarget{"a": {Brightness: 60}}
+	first, err := EvaluateSchedule(s, ScheduleState{}, now, ids, targets)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := EvaluateSchedule(first.Settings, first.State, now, ids, first.Targets); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

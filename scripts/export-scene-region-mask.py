@@ -50,9 +50,11 @@ def main():
     master = ROOT / 'frontend/public/scene-morph-mask-v7.png'
     deployed = ROOT / 'frontend/public/scenes/live/mask.webp'
     Image.fromarray(mask).save(master, optimize=True)
-    Image.fromarray(mask).convert('RGB').save(deployed, lossless=True, method=6)
+    band = mask[376:705]
+    assert np.array_equal(mask, np.pad(band, ((376, height-705), (0, 0)), mode='edge'))
+    Image.fromarray(band).convert('RGB').save(deployed, lossless=True, method=6)
     assert set(np.unique(mask)) == {141, 166, 204}
-    assert np.array_equal(np.array(Image.open(deployed).convert('L')), mask)
+    assert np.array_equal(np.array(Image.open(deployed).convert('L')), band)
     # Entire upper sky is a single weight, including all former white spots.
     assert np.all(mask[:370] == 204)
     proof = ROOT / 'build/diagnostics/scene-region-mask'

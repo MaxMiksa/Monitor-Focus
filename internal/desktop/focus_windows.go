@@ -15,6 +15,12 @@ import (
 )
 
 var (
+	focusIsWindowVisible = u32.NewProc("IsWindowVisible")
+	focusIsIconic        = u32.NewProc("IsIconic")
+	focusGetClassNameW   = u32.NewProc("GetClassNameW")
+	focusIsZoomed        = u32.NewProc("IsZoomed")
+	focusGetWindowRect   = u32.NewProc("GetWindowRect")
+
 	enumerations      sync.Map
 	enumerationID     atomic.Uint64
 	monitorCallback   = windows.NewCallback(enumMonitor)
@@ -111,8 +117,8 @@ func enumOccupancy(hwnd, token uintptr) uintptr {
 		return 0
 	}
 	e := v.(*enumeration)
-	visible, _, _ := u32.NewProc("IsWindowVisible").Call(hwnd)
-	iconic, _, _ := u32.NewProc("IsIconic").Call(hwnd)
+	visible, _, _ := focusIsWindowVisible.Call(hwnd)
+	iconic, _, _ := focusIsIconic.Call(hwnd)
 	if visible == 0 || iconic != 0 {
 		return 1
 	}
@@ -120,7 +126,7 @@ func enumOccupancy(hwnd, token uintptr) uintptr {
 		return 1
 	}
 	var class [256]uint16
-	n, _, _ := u32.NewProc("GetClassNameW").Call(hwnd, uintptr(unsafe.Pointer(&class[0])), uintptr(len(class)))
+	n, _, _ := focusGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&class[0])), uintptr(len(class)))
 	if n == 0 {
 		return 1
 	}
@@ -133,7 +139,7 @@ func enumOccupancy(hwnd, token uintptr) uintptr {
 	if int32(hr) < 0 || cloaked != 0 {
 		return 1
 	}
-	maximized, _, _ := u32.NewProc("IsZoomed").Call(hwnd)
+	maximized, _, _ := focusIsZoomed.Call(hwnd)
 	if maximized != 0 {
 		h, _, _ := monitorFromWindow.Call(hwnd, 0)
 		var mi monitorInfo
@@ -149,7 +155,7 @@ func enumOccupancy(hwnd, token uintptr) uintptr {
 	}
 	var bounds Rect
 	hr, _, _ = dwmAttribute.Call(hwnd, 9, uintptr(unsafe.Pointer(&bounds)), unsafe.Sizeof(bounds))
-	if int32(hr) < 0 && boolCall(u32.NewProc("GetWindowRect"), hwnd, uintptr(unsafe.Pointer(&bounds))) != nil {
+	if int32(hr) < 0 && boolCall(focusGetWindowRect, hwnd, uintptr(unsafe.Pointer(&bounds))) != nil {
 		return 1
 	}
 	for _, d := range e.displays {

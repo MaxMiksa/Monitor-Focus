@@ -204,9 +204,10 @@ func ReconcileSchedule(state ScheduleState, old, next Settings) ScheduleState {
 
 // EvaluateSchedule is a pure reducer. On a live node (within two seconds) manual
 // targets become fade origins. After startup/sleep use canonical plan values.
+// Unchanged Settings are borrowed read-only; ApplyBehavior creates a separate draft.
 // Calls during a fade do not keep applying behavior or resetting focus timers.
 func EvaluateSchedule(s Settings, state ScheduleState, now time.Time, available []string, current map[string]DisplayTarget) (ScheduleEvaluation, error) {
-	r := ScheduleEvaluation{State: state, Settings: s.Clone(), Targets: CloneTargets(current)}
+	r := ScheduleEvaluation{State: state, Settings: s, Targets: CloneTargets(current)}
 	r.Plan = evaluatePlan(s, now, &r.State.Solar)
 	if r.Plan == nil {
 		return r, nil

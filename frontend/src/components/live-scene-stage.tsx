@@ -82,6 +82,10 @@ const fragmentSource = `
   const vec2 imageSize = vec2(${seedPatches.imageSize.join('.0, ')}.0);
   const vec2 seedCell = vec2(${seedPatches.cellSize.join('.0, ')}.0);
   const vec2 seedAtlasSize = vec2(${seedPatches.atlasSize.join('.0, ')}.0);
+  // Redundant sky/ground rows are supplied by CLAMP_TO_EDGE, not resampled.
+  float regionAt(vec2 pixel) {
+    return texture2D(regionMask, vec2(pixel.x / imageSize.x, (pixel.y - 376.0) / 329.0)).r;
+  }
   bool inSeed(vec2 p) {
     return p.x >= .5 && p.y >= .5 && p.x <= seedCell.x - .5 && p.y <= seedCell.y - .5;
   }
@@ -105,7 +109,7 @@ const fragmentSource = `
       float visibility = transform.w;
       if (seedWind > .5) {
         // Reuse the existing machine/ground mask, never paint seeds over devices.
-        visibility *= smoothstep(.73, .81, texture2D(regionMask, pixel / imageSize).r);
+        visibility *= smoothstep(.73, .81, regionAt(pixel));
       }
       // Signed detail preserves both pale hairs and darker stems. No blue rectangle.
       if (fromSnapshot < .5) a += (texture2D(fromFrame, originalUv).rgb - seedSky(p, index, seedRows.x)) * visibility;
@@ -122,7 +126,7 @@ const fragmentSource = `
       ${seedCalls('driftSeed')}
     }
     float difference = length(toColor - fromColor) / 1.732;
-    float region = texture2D(regionMask, imageUv).r;
+    float region = regionAt(imagePixel);
     float detail = difference * .28;
     float weight = clamp((progress - (1.0 - region) * .46 - (1.0 - detail) * .10) / .42, 0.0, 1.0);
     float soft = ease(weight);
