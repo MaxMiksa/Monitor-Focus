@@ -35,6 +35,11 @@ func processCreated(pid uint32) (uint64, error) {
 	if err = windows.GetProcessTimes(h, &created, &exited, &kernel, &user); err != nil {
 		return 0, err
 	}
+	// Windows may retain an exited process object while another handle exists.
+	// Its creation time alone does not prove that the journal owner is alive.
+	if exited.HighDateTime != 0 || exited.LowDateTime != 0 {
+		return 0, windows.ERROR_INVALID_PARAMETER
+	}
 	return uint64(created.HighDateTime)<<32 | uint64(created.LowDateTime), nil
 }
 

@@ -313,9 +313,24 @@ func (w *Worker) Rescan() error {
 		if !Console() {
 			return errors.New("not physical console session")
 		}
+		// GDI numbers may have changed. Resolve current identities before restoring
+		// colors; otherwise the old mapping blocks the very scan needed to fix it.
+		bindings, err := currentDisplayBindings()
+		if err != nil {
+			return err
+		}
 		var failures []error
 		for _, d := range w.Displays {
-			if err := w.restoreGamma(d); err != nil {
+			device := d.GDI
+			if d.color != nil {
+				var err error
+				device, err = displayBinding(bindings, d.Id)
+				if err != nil {
+					failures = append(failures, err)
+					continue
+				}
+			}
+			if err := w.restoreGammaAt(d, device); err != nil {
 				failures = append(failures, err)
 			}
 		}
@@ -331,6 +346,50 @@ func (w *Worker) Rescan() error {
 		}
 		return errors.Join(failures...)
 	})
+}
+
+func (w *Worker) restoreGammaAt(d *Display, device string) error {
+	// Temporarily rebind only for gamma. On failure, the old DDC handle must
+	// remain paired with its old GDI name so subsequent writes still fail closed.
+	previous := d.GDI
+	d.GDI = device
+	defer func() { d.GDI = previous }()
+	return w.restoreGamma(d)
+}
+
+type displayBindings map[string][]string
+
+func displayBinding(bindings displayBindings, id string) (string, error) {
+	devices := bindings[strings.ToUpper(id)]
+	if len(devices) != 1 {
+		return "", fmt.Errorf("display offline or ambiguous during rescan: %s", id)
+	}
+	return devices[0], nil
+}
+
+// Read topology without touching brightness, gamma or physical DDC handles.
+func currentDisplayBindings() (displayBindings, error) {
+	bindings := displayBindings{}
+	var failures []error
+	err := enumerateMonitors(func(handle uintptr) uintptr {
+		var info monitorInfo
+		info.Size = uint32(unsafe.Sizeof(info))
+		ok, _, _ := user32.NewProc("GetMonitorInfoW").Call(handle, uintptr(unsafe.Pointer(&info)))
+		if ok == 0 {
+			failures = append(failures, errors.New("GetMonitorInfo failed during rescan"))
+			return 1
+		}
+		device := windows.UTF16ToString(info.Device[:])
+		id, err := Identity(device)
+		if err != nil {
+			failures = append(failures, err)
+			return 1
+		}
+		key := strings.ToUpper(id)
+		bindings[key] = append(bindings[key], device)
+		return 1
+	})
+	return bindings, errors.Join(append(failures, err)...)
 }
 
 // Only identity/topology reads: no DDC transaction, COM call or hardware write.
