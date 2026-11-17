@@ -15,7 +15,7 @@ import type { WeatherSearchDraft } from '@/components/weather-settings'
 import { previewSky } from '@/lib/sky-preference'
 import type { StageKey } from '@/components/scene-panel'
 import { SortableList } from '@/components/sortable-list'
-import { DisplayRow, Level } from '@/App'
+import { DisplayRow, Level } from './display-controls'
 import type { Send } from '@/App'
 import { captureBehavior } from '@/lib/control'
 import type { Display, EdgeWheelModifier, Snapshot } from '@/lib/control'
@@ -26,10 +26,10 @@ const SkySettingsEditor = lazy(() => import('./sky-settings').then(module => ({ 
 
 export type SettingsEditorHandle = { flush: () => Promise<boolean>; chooseWeatherLocation: () => void }
 const tabs = ['displays', 'scenes', 'schedule', 'focus', 'general'] as const
-export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boolean; close: () => void; snapshot: Snapshot; send: Send; ref: Ref<SettingsEditorHandle> }) {
-  const { progress, settingsOpacity, clipPath } = useSettingsMorph()
+export function SettingsEditor({ initialCitySearch, open, close, snapshot, send, ref }: { initialCitySearch?: boolean; open: boolean; close: () => void; snapshot: Snapshot; send: Send; ref: Ref<SettingsEditorHandle> }) {
+  const { progress } = useSettingsMorph()
   const { t, sceneName, setLanguage, displayName, message: translateMessage } = useI18n()
-  const [page, setPage] = useState<Page>('displays')
+  const [page, setPage] = useState<Page>(initialCitySearch ? 'general' : 'displays')
   const [collapsed, setCollapsed] = useState(!open)
   useEffect(() => progress.on('change', value => setCollapsed(value <= .0001)), [progress])
   const contentMounted = open || !collapsed
@@ -41,7 +41,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
     return () => previewSky(null)
   }, [open, editingSky, skyScene])
   const navigation = useRef<HTMLElement>(null)
-  const [weatherSearch, setWeatherSearch] = useState<WeatherSearchDraft>({ query: '', editing: false })
+  const [weatherSearch, setWeatherSearch] = useState<WeatherSearchDraft>({ query: '', editing: !!initialCitySearch })
   const { draft, change, undo, redo, reload, flush, saving, status, hasFailure, canUndo, canRedo } = useSettingsHistory(snapshot, send)
   const weatherCity = draft.appearance.weather.city
   const solarLocation = weatherCity ? { Name: weatherCity.name, Latitude: weatherCity.latitude, Longitude: weatherCity.longitude } : draft.SolarLocation ?? null
@@ -74,9 +74,8 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
     return () => window.removeEventListener('keydown', onKey)
   }, [open, page, close])
   const deviceSend: Send = async command => await flush() ? send(command) : null
-  return <motion.section className="settings-float" data-dismiss-region="settings" aria-label={t('设置')} aria-hidden={!open} inert={!open}
-    style={{ opacity: settingsOpacity, clipPath, pointerEvents: open ? 'auto' : 'none' }}>
-    <Suspense fallback={null}>{contentMounted && <div className={`settings-content settings-page-${page}${editingSky ? ' settings-editing-sky' : ''}`} key={page}>
+  return contentMounted ? <>
+    <Suspense fallback={null}><div className={`settings-content settings-page-${page}${editingSky ? ' settings-editing-sky' : ''}`} key={page}>
     {editingSky && <SkySettingsEditor scene={skyScene} selectScene={setSkyScene} value={draft.appearance.sky} change={update => change(s => update(s.appearance.sky[skyScene]))} back={() => setSkyOpen(false)} seedsAvailable={stageStyle === 'live'} />}
     {page === 'displays' && <>
       <div className="device-brightness">{snapshot.Displays.map(display => <CurrentDisplay key={display.Id} display={display} send={deviceSend} />)}</div>
@@ -121,7 +120,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
       <WeatherSettings active={open} searchDraft={weatherSearch} onSearchDraftChange={setWeatherSearch} value={draft.appearance.weather} onChange={weather => change(s => { s.appearance.weather = weather; if (weather.city) s.SolarLocation = { Name: weather.city.name, Latitude: weather.city.latitude, Longitude: weather.city.longitude } })} />
       </div>
     </>}
-    </div>}</Suspense>
+    </div></Suspense>
     <footer className="settings-bottom">
       <div className="settings-bottom-status">
         <Button variant="ghost" size="icon" aria-label={t('重新检测显示器')} title={t('重新检测显示器')} onClick={() => void deviceSend({ Action: 'rescan' })}><RefreshCw /></Button>
@@ -141,7 +140,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
         <Button variant="ghost" size="icon" aria-label={t('重做')} title={t('重做')} disabled={!canRedo} onClick={redo}><Redo2 /></Button>
       </div>
     </footer>
-  </motion.section>
+  </> : null
 }
 
 function CurrentDisplay({ display, send }: { display: Display; send: Send }) {

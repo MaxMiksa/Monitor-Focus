@@ -4,6 +4,18 @@ import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } fro
 import { SettingsMorphContext, useSettingsMorph } from './settings-morph-context'
 import type { MorphRect } from './settings-morph-context'
 
+import { useI18n } from '@/lib/i18n-context'
+
+// The empty shell is the stable measurement target for the capsule animation.
+export function SettingsShell({ open, children }: { open: boolean; children: ReactNode }) {
+  const { t } = useI18n()
+  const { settingsOpacity, clipPath } = useSettingsMorph()
+  return <motion.section className="settings-float" data-dismiss-region="settings" aria-label={t('设置')}
+    aria-hidden={!open} inert={!open} style={{ opacity: settingsOpacity, clipPath, pointerEvents: open ? 'auto' : 'none' }}>
+    {children}
+  </motion.section>
+}
+
 const empty: MorphRect = { x: 0, y: 0, width: 0, height: 0 }
 
 export function SettingsMorph({ open, children }: { open: boolean; children: ReactNode }) {
