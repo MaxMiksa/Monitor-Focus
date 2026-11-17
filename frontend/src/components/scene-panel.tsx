@@ -11,7 +11,7 @@ import { SkyEffects } from '@/components/sky-effects'
 import { RainAtmosphere, WeatherRainOverlay } from '@/components/weather-rain'
 import { SettingsMorphSurface } from '@/components/settings-morph'
 import { useSettingsMorph } from '@/components/settings-morph-context'
-import { SKY_PREVIEW_EVENT, skyScenes } from '@/lib/sky-preference'
+import { SKY_PREVIEW_EVENT, skyScenes, useSkyPreferences } from '@/lib/sky-preference'
 import type { Display, Snapshot } from '@/lib/control'
 import type { Send } from '@/App'
 
@@ -100,6 +100,7 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
   const reduced = useReducedMotion()
   const [style] = useStageStyle()
   const [barStyle] = useSceneBarStyle()
+  const sky = useSkyPreferences()
   const [skyPreview, setSkyPreview] = useState<StageKey | null>(null)
   useEffect(() => {
     const listener = (event: Event) => {
@@ -109,7 +110,6 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
     window.addEventListener(SKY_PREVIEW_EVENT, listener)
     return () => window.removeEventListener(SKY_PREVIEW_EVENT, listener)
   }, [])
-  const { rain, weather, city } = useWeatherRain(true, weatherOpen && !settingsOpen)
   const ids = useMemo(() => inferSceneKeys(snapshot), [snapshot])
   const sourceScene = useMemo(() => inferSceneFromSource(snapshot, ids), [snapshot, ids])
   const [now, setNow] = useState(() => new Date())
@@ -192,10 +192,12 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
   }, [change, settingsOpen, openSettings, weatherOpen, setWeatherOpen])
 
   const visibleStage = settingsOpen && skyPreview ? skyPreview : scene
+  const seedMotion = sky[visibleStage].seeds.motion
+  const { rain, weather, city } = useWeatherRain(true, weatherOpen && !settingsOpen, style === 'live' && seedMotion === 'wind' && !reduced)
   return <div className="scene-shell" data-scene={visibleStage} data-stage="live" data-background={style} data-settings-open={settingsOpen} data-weather-open={weatherOpen && !settingsOpen} data-raining={rain > 0}>
     <div className="scene-backdrop" aria-hidden="true">
-      {style === 'live' ? <LiveSceneStage key="live" scene={visibleStage} reduced={!!reduced} /> : sceneKeys.map(key => <div key={key} className="scene-image" data-active={visibleStage === key} style={{ backgroundImage: `url('${sceneAssets[key]}')` }} />)}
-      <SkyEffects scene={visibleStage} reduced={!!reduced} /><RainAtmosphere rain={rain} scene={visibleStage} />
+      {style === 'live' ? <LiveSceneStage key="live" scene={visibleStage} reduced={!!reduced} seedMotion={seedMotion} seedWind={weather.wind ?? null} seedRain={seedMotion === 'wind' ? Math.max(rain, weather.rain) : 0} /> : sceneKeys.map(key => <div key={key} className="scene-image" data-active={visibleStage === key} style={{ backgroundImage: `url('${sceneAssets[key]}')` }} />)}
+      <SkyEffects scene={visibleStage} reduced={!!reduced} settings={sky[visibleStage]} /><RainAtmosphere rain={rain} scene={visibleStage} />
     </div>
     <div className="window-drag-region" data-app-region="drag" aria-hidden="true" />
     <div className="scene-wash" aria-hidden="true" />

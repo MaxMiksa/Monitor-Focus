@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { StageKey } from '@/components/scene-panel'
 import seedPatches from '@/lib/seed-patches.json'
+import { advanceSeedFlow } from '@/lib/seed-motion'
+import type { SeedFlow, SeedMotion } from '@/lib/seed-motion'
+import type { WeatherWind } from '@/lib/weather-wind'
 
 const WIDTH = 1672
 const HEIGHT = 941
@@ -49,7 +52,9 @@ const fragmentSource = `
   uniform sampler2D regionMask;
   uniform sampler2D seedPatches;
   uniform vec2 seedRows;
-  uniform vec2 seedOffsets[${seedPatches.origins.length}];
+  uniform vec4 seedOffsets[${seedPatches.origins.length}];
+  uniform float seedWind;
+  uniform float seedRain;
   uniform float progress;
   uniform float fromSnapshot;
   uniform float toSnapshot;
@@ -90,13 +95,21 @@ const fragmentSource = `
       if (toSnapshot < .5) b = seedSky(p, index, seedRows.y);
     }
   }
-  void driftSeed(inout vec3 a, inout vec3 b, vec2 pixel, vec2 origin, float index, vec2 offset) {
-    vec2 p = pixel - origin - offset;
+  void driftSeed(inout vec3 a, inout vec3 b, vec2 pixel, vec2 origin, float index, vec4 transform) {
+    vec2 local = pixel - origin - transform.xy - seedCell * .5;
+    if (abs(local.x) > seedCell.x * .8 || abs(local.y) > seedCell.y * .8) return;
+    float c = cos(transform.z), s = sin(transform.z);
+    vec2 p = vec2(c * local.x + s * local.y, -s * local.x + c * local.y) + seedCell * .5;
     if (inSeed(p)) {
       vec2 originalUv = (origin + p) / imageSize;
+      float visibility = transform.w;
+      if (seedWind > .5) {
+        // Reuse the existing machine/ground mask, never paint seeds over devices.
+        visibility *= smoothstep(.73, .81, texture2D(regionMask, pixel / imageSize).r);
+      }
       // Signed detail preserves both pale hairs and darker stems. No blue rectangle.
-      if (fromSnapshot < .5) a += texture2D(fromFrame, originalUv).rgb - seedSky(p, index, seedRows.x);
-      if (toSnapshot < .5) b += texture2D(toFrame, originalUv).rgb - seedSky(p, index, seedRows.y);
+      if (fromSnapshot < .5) a += (texture2D(fromFrame, originalUv).rgb - seedSky(p, index, seedRows.x)) * visibility;
+      if (toSnapshot < .5) b += (texture2D(toFrame, originalUv).rgb - seedSky(p, index, seedRows.y)) * visibility;
     }
   }
   void main() {
@@ -105,7 +118,7 @@ const fragmentSource = `
     vec3 toColor = texture2D(toFrame, imageUv).rgb;
     vec2 imagePixel = imageUv * imageSize;
     ${seedCalls('clearSeed')}
-    if (rainAmount < .01) {
+    if (seedWind > .5 || seedRain < .01) {
       ${seedCalls('driftSeed')}
     }
     float difference = length(toColor - fromColor) / 1.732;
@@ -176,6 +189,10 @@ type StageRuntime = {
   seeds: WebGLTexture
   seedPhase: number
   seedOffsets: Float32Array
+  seedMotion: SeedMotion
+  seedFlow: SeedFlow | null
+  seedWind: WeatherWind | null
+  seedRain: number
   rain: number
   rainTime: number
   lastTick: number
@@ -196,7 +213,7 @@ type StageRuntime = {
   animation: number
   direction: number
   reduced: boolean
-  uniforms: Record<'from' | 'to' | 'mask' | 'seeds' | 'seedRows' | 'seedOffsets' | 'progress' | 'direction' | 'rain' | 'rainTime' | 'aspect' | 'coverScale' | 'coverOffset' | 'snapshot' | 'toSnapshot' | 'capture', WebGLUniformLocation | null>
+  uniforms: Record<'from' | 'to' | 'mask' | 'seeds' | 'seedRows' | 'seedOffsets' | 'seedWind' | 'seedRain' | 'progress' | 'direction' | 'rain' | 'rainTime' | 'aspect' | 'coverScale' | 'coverOffset' | 'snapshot' | 'toSnapshot' | 'capture', WebGLUniformLocation | null>
   dispose: () => void
 }
 
@@ -241,6 +258,7 @@ function draw(runtime: StageRuntime, progress: number, capture = false) {
     runtime.canvas.dataset.transition = String(runtime.running)
     runtime.canvas.dataset.textureCount = String(runtime.target ? 4 : 3)
     runtime.canvas.dataset.seedPhase = runtime.seedPhase.toFixed(5)
+    runtime.canvas.dataset.seedMotion = runtime.seedMotion
     runtime.canvas.dataset.rain = runtime.rain.toFixed(3)
     resize(runtime)
   }
@@ -253,16 +271,20 @@ function draw(runtime: StageRuntime, progress: number, capture = false) {
   gl.activeTexture(gl.TEXTURE3)
   gl.bindTexture(gl.TEXTURE_2D, runtime.seeds)
   gl.uniform2f(uniforms.seedRows, seedPatches.scenes.indexOf(runtime.previous), seedPatches.scenes.indexOf(runtime.scene))
-  for (let index = 0; index < seedPatches.origins.length; index += 1) {
+  if (runtime.seedMotion === 'float') for (let index = 0; index < seedPatches.origins.length; index += 1) {
     const phase = index * 1.731
     const speed = 5 + index % 3
     // Evaluate once per seed per draw, rather than for every sky pixel.
     const seedPhase = capture ? runtime.presentedSeedPhase : runtime.seedPhase
-    runtime.seedOffsets[index * 2] = (Math.sin(seedPhase * speed + phase) - Math.sin(phase))
+    runtime.seedOffsets[index * 4] = (Math.sin(seedPhase * speed + phase) - Math.sin(phase))
       * (34 + index % 4 * 4) + Math.sin(seedPhase * 2) * 16
-    runtime.seedOffsets[index * 2 + 1] = (Math.sin(seedPhase * (speed + 1) + phase * .7) - Math.sin(phase * .7)) * 6
+    runtime.seedOffsets[index * 4 + 1] = (Math.sin(seedPhase * (speed + 1) + phase * .7) - Math.sin(phase * .7)) * 6
+    runtime.seedOffsets[index * 4 + 2] = 0
+    runtime.seedOffsets[index * 4 + 3] = 1
   }
-  gl.uniform2fv(uniforms.seedOffsets, runtime.seedOffsets)
+  gl.uniform4fv(uniforms.seedOffsets, runtime.seedOffsets)
+  gl.uniform1f(uniforms.seedWind, runtime.seedMotion === 'wind' ? 1 : 0)
+  gl.uniform1f(uniforms.seedRain, runtime.seedRain)
   gl.uniform1f(uniforms.progress, progress)
   gl.uniform1f(uniforms.rain, runtime.rain)
   gl.uniform1f(uniforms.rainTime, runtime.rainTime)
@@ -355,6 +377,8 @@ async function createRuntime(canvas: HTMLCanvasElement, scene: StageKey, reduced
     seeds: gl.getUniformLocation(program, 'seedPatches'),
     seedRows: gl.getUniformLocation(program, 'seedRows'),
     seedOffsets: gl.getUniformLocation(program, 'seedOffsets[0]'),
+    seedWind: gl.getUniformLocation(program, 'seedWind'),
+    seedRain: gl.getUniformLocation(program, 'seedRain'),
     progress: gl.getUniformLocation(program, 'progress'),
     snapshot: gl.getUniformLocation(program, 'fromSnapshot'),
     toSnapshot: gl.getUniformLocation(program, 'toSnapshot'),
@@ -377,7 +401,11 @@ async function createRuntime(canvas: HTMLCanvasElement, scene: StageKey, reduced
     mask: makeTexture(gl, maskImage),
     seeds: makeTexture(gl, seedImage),
     seedPhase: 0,
-    seedOffsets: new Float32Array(seedPatches.origins.length * 2),
+    seedOffsets: new Float32Array(seedPatches.origins.length * 4),
+    seedMotion: 'float',
+    seedFlow: null,
+    seedWind: null,
+    seedRain: 0,
     rain: 0,
     rainTime: 0,
     lastTick: 0,
@@ -475,6 +503,8 @@ function tickAir(runtime: StageRuntime, signal: AbortSignal, now: number) {
   runtime.rainTime = (runtime.rainTime + delta) % 1000
   const interval = 1000 / Math.min(MAX_FPS, runtime.running ? MAX_FPS : runtime.rain > 0 ? 24 : AIR_PROFILES[runtime.scene].idleFps)
   if (now - runtime.lastDraw >= interval - 1) {
+    if (runtime.seedFlow) advanceSeedFlow(runtime.seedFlow, runtime.seedOffsets, seedPatches.origins,
+      runtime.lastDraw ? (now - runtime.lastDraw) / 1000 : 0, runtime.seedWind, runtime.seedRain)
     if (runtime.lastDraw) runtime.canvas.dataset.airMeasuredFps = (1000 / Math.max(now - runtime.lastDraw, 1)).toFixed(1)
     runtime.lastDraw = now
     if (runtime.running && transitionProgress(runtime) >= 1) finish(runtime, signal)
@@ -567,12 +597,24 @@ function requestTransition(runtime: StageRuntime, signal: AbortSignal): Promise<
   return playTransition(runtime, runtime.wanted, signal)
 }
 
-export function LiveSceneStage({ scene, reduced, rain = 0 }: { scene: StageKey; reduced: boolean; rain?: number }) {
+function configureSeedMotion(runtime: StageRuntime, motion: SeedMotion, wind: WeatherWind | null, rain: number) {
+  if (motion !== runtime.seedMotion) {
+    // Start at the last presented locations; changing weather never resets seeds.
+    runtime.seedMotion = motion
+    runtime.seedFlow = motion === 'wind' ? { time: 0, vx: 0, vy: 0 } : null
+  }
+  runtime.seedWind = wind
+  runtime.seedRain = Math.max(0, Math.min(1, rain))
+}
+
+export function LiveSceneStage({ scene, reduced, rain = 0, seedMotion = 'float', seedWind = null, seedRain = 0 }: {
+  scene: StageKey; reduced: boolean; rain?: number; seedMotion?: SeedMotion; seedWind?: WeatherWind | null; seedRain?: number
+}) {
   const [unavailable, setUnavailable] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const runtimeRef = useRef<StageRuntime | null>(null)
   const signalRef = useRef<AbortController | null>(null)
-  const latestRef = useRef({ scene, reduced, rain })
+  const latestRef = useRef({ scene, reduced, rain, seedMotion, seedWind, seedRain })
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -586,6 +628,7 @@ export function LiveSceneStage({ scene, reduced, rain = 0 }: { scene: StageKey; 
       runtimeRef.current = runtime
       runtime.reduced = latestRef.current.reduced
       runtime.rain = latestRef.current.rain
+      configureSeedMotion(runtime, latestRef.current.seedMotion, latestRef.current.seedWind, latestRef.current.seedRain)
       if (!document.hidden) draw(runtime, transitionProgress(runtime))
       runtime.wanted = latestRef.current.scene
       if (idlePaused(runtime)) stopAir(runtime)
@@ -607,18 +650,19 @@ export function LiveSceneStage({ scene, reduced, rain = 0 }: { scene: StageKey; 
   }, [])
 
   useEffect(() => {
-    latestRef.current = { scene, reduced, rain }
+    latestRef.current = { scene, reduced, rain, seedMotion, seedWind, seedRain }
     const runtime = runtimeRef.current
     const signal = signalRef.current?.signal
     if (!runtime || !signal) return
     runtime.reduced = reduced
     runtime.rain = Math.max(0, Math.min(1, rain))
+    configureSeedMotion(runtime, seedMotion, seedWind, seedRain)
     if (!document.hidden) draw(runtime, transitionProgress(runtime))
     runtime.wanted = scene
     if (idlePaused(runtime)) { stopAir(runtime); if (runtime.running) finish(runtime, signal) }
     else startAir(runtime, signal)
     void requestTransition(runtime, signal)
-  }, [scene, reduced, rain])
+  }, [scene, reduced, rain, seedMotion, seedWind, seedRain])
 
   return <canvas ref={canvasRef} className={`live-stage-canvas${unavailable ? ' live-stage-unavailable' : ''}`} style={unavailable ? { backgroundImage: `url('${sources[scene]}')` } : undefined} aria-hidden="true" />
 }

@@ -1,6 +1,7 @@
 import { validWeatherDetails, weatherDay } from './weather-details'
 import type { WeatherDetails } from './weather-details'
 import type { WeatherCity } from './weather'
+import { domesticWind } from './weather-wind'
 
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' ? value as Record<string, unknown> : {}
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
@@ -71,5 +72,5 @@ export function parseDomesticWeather(value: unknown, city: WeatherCity, now = Da
   if (!validWeatherDetails(details)) throw new Error('Invalid domestic details')
   // Forecast rain belongs only to advice. A dry current condition never starts rain.
   const rainy = [51, 61, 63, 65, 66, 80, 82, 95, 96].includes(code)
-  return { at, rain: rainy ? Math.min(1, .35 + data.precipitation * .13) : 0, details }
+  return { at, rain: rainy ? Math.min(1, .35 + data.precipitation * .13) : 0, details, wind: domesticWind(data) }
 }

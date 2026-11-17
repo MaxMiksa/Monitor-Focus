@@ -11,9 +11,10 @@ import type { TextKey } from '@/lib/i18n'
 
 const names = { morning: '早晨', midday: '中午', dusk: '傍晚', night: '夜晚' } as const
 
-export function SkySettingsEditor({ scene, selectScene, value, change, back }: {
+export function SkySettingsEditor({ scene, selectScene, value, change, back, seedsAvailable }: {
   scene: StageKey; selectScene: (scene: StageKey) => void; value: SkyPreferences
   change: (update: (value: SkySettings) => void) => void; back: () => void
+  seedsAvailable: boolean
 }) {
   const { t } = useI18n()
   const sky = value[scene]
@@ -41,6 +42,7 @@ export function SkySettingsEditor({ scene, selectScene, value, change, back }: {
         <SkySlider label="速度" aria="云彩速度" value={sky.clouds.speed} change={v => change(s => { s.clouds.speed = v })} />
       </section>
     </div>
+    {seedsAvailable && <div className="form-row"><label htmlFor="seed-motion">{t('蒲公英动效')}</label><Select id="seed-motion" value={sky.seeds.motion} onValueChange={v => change(s => { s.seeds.motion = v === 'wind' ? 'wind' : 'float' })} options={[{ value: 'float', label: t('原有轻漂') }, { value: 'wind', label: t('随风漂浮') }]} /></div>}
   </div>
 }
 

@@ -77,7 +77,7 @@ export function SettingsEditor({ open, close, snapshot, send, ref }: { open: boo
   return <motion.section className="settings-float" data-dismiss-region="settings" aria-label={t('设置')} aria-hidden={!open} inert={!open}
     style={{ opacity: settingsOpacity, clipPath, pointerEvents: open ? 'auto' : 'none' }}>
     <Suspense fallback={null}>{contentMounted && <div className={`settings-content settings-page-${page}${editingSky ? ' settings-editing-sky' : ''}`} key={page}>
-    {editingSky && <SkySettingsEditor scene={skyScene} selectScene={setSkyScene} value={draft.appearance.sky} change={update => change(s => update(s.appearance.sky[skyScene]))} back={() => setSkyOpen(false)} />}
+    {editingSky && <SkySettingsEditor scene={skyScene} selectScene={setSkyScene} value={draft.appearance.sky} change={update => change(s => update(s.appearance.sky[skyScene]))} back={() => setSkyOpen(false)} seedsAvailable={stageStyle === 'live'} />}
     {page === 'displays' && <>
       <div className="device-brightness">{snapshot.Displays.map(display => <CurrentDisplay key={display.Id} display={display} send={deviceSend} />)}</div>
       <GlassStatus snapshot={snapshot} send={deviceSend} error="" sceneIds={{ morning: null, midday: null, dusk: null, night: null }} />

@@ -27,6 +27,7 @@ const details = modules.get('weather-details').namespace
 const city = { id: 1916136, name: '深圳 · 南山', detail: '广东 · 中国', latitude: 22.538, longitude: 113.93889 }
 const now = Date.parse('2026-11-16T15:20:00+08:00')
 const sample = { province: '广东省', city: '深圳市', district: '南山区', adcode: '440305', weather: '多云',
+  wind_direction: '东南风', wind_power: '3级',
   temperature: 28, feels_like: 29, precipitation: 0, report_time: '9 分钟前发布',
   forecast: [{ date: '2026-11-16', temp_min: 21, temp_max: 28, sunrise: '06:37', sunset: '17:40' }],
   hourly_forecast: [16, 17, 18].map(hour => ({ time: `2026-11-16 ${hour}:00:00`, weather: '阵雨', feels_like: 27, pop: 70, precip: 1 })) }
@@ -34,6 +35,8 @@ const parsed = domestic.parseDomesticWeather(sample, city, now)
 assert.equal(parsed.rain, 0)
 assert.equal(parsed.details.code, 2)
 assert.equal(parsed.details.outlook.gust, null)
+assert.equal(parsed.wind.direction, 135)
+assert.equal(parsed.wind.estimated, true)
 assert.equal(details.travelAdvice(parsed.details), '未来几小时有雨，记得带伞')
 assert(domestic.parseDomesticWeather({ ...sample, weather: '小雨', precipitation: 1 }, city, now).rain > 0)
 for (const invalid of [{ ...sample, city: '鹤岗市' }, { ...sample, report_time: '31 分钟前发布' },
@@ -60,9 +63,12 @@ calls = []
 globalThis.fetch = async url => {
   calls.push(url.hostname)
   if (url.hostname === 'uapis.cn') throw new Error('Offline')
-  return Response.json({ current: { time: realNow / 1000, rain: 0, showers: 0, weather_code: 2 } })
+  assert(url.searchParams.get('current').includes('wind_direction_10m'))
+  return Response.json({ current: { time: realNow / 1000, rain: 0, showers: 0, weather_code: 2, wind_speed_10m: 18, wind_direction_10m: 270, wind_gusts_10m: 25 } })
 }
-assert.equal((await weather.namespace.currentWeather(city, new AbortController().signal)).source, 'open-meteo')
+const fallback = await weather.namespace.currentWeather(city, new AbortController().signal)
+assert.equal(fallback.source, 'open-meteo')
+assert.deepEqual(fallback.wind, { speed: 18, direction: 270, gust: 25, estimated: false })
 assert.deepEqual(calls, ['uapis.cn', 'api.open-meteo.com'])
 calls = []
 const cancelled = new AbortController()

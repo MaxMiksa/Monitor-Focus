@@ -1,8 +1,10 @@
+import { useMemo, useSyncExternalStore } from 'react'
 import type { StageKey } from '@/components/scene-panel'
 
 export type SkySettings = {
   stars: { enabled: boolean; style: 'sparse' | 'dense'; count: number; brightness: number; twinkle: number }
   clouds: { enabled: boolean; style: 'legacy' | 'wisps' | 'puffs' | 'layers'; layout: CloudLayout; motion: 'drift' | 'float'; density: number; speed: number }
+  seeds: { motion: 'float' | 'wind' }
 }
 export const cloudLayouts = ['original', 'scatter', 'stagger', 'arc', 'depth'] as const
 export type CloudLayout = typeof cloudLayouts[number]
@@ -34,8 +36,20 @@ export function readSkyPreferences(): SkyPreferences {
         motion: value?.clouds?.motion === 'float' ? 'float' : 'drift',
         density: percent(value?.clouds?.density, 35), speed: percent(value?.clouds?.speed, 20),
       },
+      seeds: { motion: value?.seeds?.motion === 'wind' ? 'wind' : 'float' },
     }]
   })) as SkyPreferences
+}
+
+const preferenceText = () => { try { return localStorage.getItem(SKY_KEY) } catch { return null } }
+function subscribe(listener: () => void) {
+  window.addEventListener(SKY_EVENT, listener)
+  window.addEventListener('storage', listener)
+  return () => { window.removeEventListener(SKY_EVENT, listener); window.removeEventListener('storage', listener) }
+}
+export function useSkyPreferences() {
+  const text = useSyncExternalStore(subscribe, preferenceText)
+  return useMemo(() => { void text; return readSkyPreferences() }, [text])
 }
 
 export function writeSkyPreferences(value: SkyPreferences) {

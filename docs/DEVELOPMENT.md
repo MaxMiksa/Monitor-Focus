@@ -144,6 +144,16 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 蒲公英移动范围：`live-scene-stage.tsx` 的水平／竖直振幅均为原来两倍，共享相位周期由 120 秒延长至 240 秒，保持各朵瞬时漂移速度与四场景连续相位，不增加资源或修改其他天空效果。正式构建／lint、Go test／vet、PE 检查见 `build/diagnostics/seed-range-build.log`；部署及保留包证据见 `seed-range-20261116-update.json`／`seed-range-20261116-retention.json`，保持显示目标、专注与唯一自启。未重复原生画面或长期验收。
 
+## 蒲公英随风漂浮
+
+单机器背景的天空设置沿用现有 Select，按场景保存 `seeds.motion=float|wind`，旧／未知值回退原有轻漂，读取不覆写；自动保存、预览与历史复用现有链路。双机器无可分离飞絮素材，隐藏控件且不为它读取风。`ScenePanel` 统一订阅天空偏好并传给云星与舞台，避免重复持有偏好。
+
+`weather-wind.ts` 读取现有当前天气：UAPI 的当前风向与蒲福等级取视觉等效中值（标记 estimated，不冒充实测 km/h，不用未来预报冒充当前，也不冒充阵风）；Open-Meteo 在同一个当前请求增加风速／来向／阵风，显式 km/h。无风、未知方向、无位置／缺失／旧缓存／过期均回退模拟轻风。复用单一天气所有者、15分钟刷新／30分钟失效／隐藏取消；雨景关闭时仅当前启用随风的可见舞台请求天气，不新增后台所有者或补充风请求。字段依据 [UAPI](https://uapis.cn/docs/api-reference/get-misc-weather)、[Open-Meteo](https://open-meteo.com/en/docs)，风级等效参考[气象学会蒲福表](https://www.rmets.org/metmatters/beaufort-wind-scale)。画面将东映射右、北映射上，气象来向反转为去向并压缩纵向，不声称场景相机具有真实罗盘方位。
+
+`seed-motion.ts` 对原10朵做共享缓变风场、逐朵错速／起伏／小角度转动、离屏上风侧错时补入；小雨逐朵淡出，大雨全部渐隐，雨停恢复。沿用原素材图集、灰度机器／草地遮罩、WebGL画布与帧率；粒子状态直接复用原 uniform 数组（20→40个 float，总160B，净增80B），随风模式仅再持有3个标量，不创建逐帧数组、额外纹理／快照／计时器／依赖。隐藏／减少动态效果不推进，原有轻漂的位置公式及速度保留。
+
+最小检查：`node scripts/Test-SeedMotion.mjs` 覆盖偏好兼容、风向／强弱、平滑反向、逐朵转动、雨隐恢复与30分钟模拟边界／补入（不是30分钟真实运行）；`node --experimental-vm-modules scripts/Test-WeatherSource.mjs` 覆盖同请求风字段、来源／取消与原天气规则。`build/diagnostics/seed-wind/` 保存检查、正式构建／lint／Go test／vet／PE日志、实际组件截图与浏览器证据：20次模式切换常态3张舞台纹理、场景中断峰值5、舞台卸载0，重新挂载回到3；小雨透明度总量约6.49／10、大雨约0.000008／10；重载／撤销重做、双背景适用范围及1024 DIP英文布局通过，无最终页面错误。诊断天气为受控样本，非当地实况；未重复原生画面、完整硬件回归或长期CPU／内存／显存测量，不声称整体进程内存零增加。部署 `seed-wind-20261117-update.json`，原计划继续、专注及唯一自启保留；包清理由部署脚本保护现用／自启路径。
+
 ## 连续场景过渡
 
 设置页／场景栏共用 `settings-morph.tsx` 的空玻璃外框，Motion 阻尼弹簧保留反向时速度；上下文仅共享进度与两端矩形，ResizeObserver 随窗口／栏宽更新锚点。外框位置、尺寸、圆角、材质及阴影随同一进度插值；设置内容不缩放，仅裁切／淡入淡出；场景内容在最后 3.5% 形变中交接。保持设置挂载和草稿，立即切换 inert，不依赖延时定时器；无截图／画布／纹理缓存，卸载释放观察器。系统减少动态效果时直接跳至终态。逐帧证据 `build/diagnostics/settings-morph/frames.json` 覆盖开关、90ms 间隔五次反向、图标／图文胶囊，验证无两组内容重叠、外框有界及文字 transform 为 none；未实测系统减少动态效果与长期占用。
