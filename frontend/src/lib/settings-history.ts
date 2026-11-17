@@ -1,3 +1,4 @@
+import { shareTree } from './share-tree'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Settings, Snapshot } from './control'
 import type { Send } from '@/App'
@@ -14,6 +15,8 @@ function createDraft(settings: Settings) {
 }
 type Draft = ReturnType<typeof createDraft>
 type History = { past: Draft[]; present: Draft; future: Draft[] }
+const HISTORY_LIMIT = 20
+function remember(h: History) { return [...h.past.slice(1 - HISTORY_LIMIT), h.present] }
 function settingsOf(draft: Draft): Settings {
   const { appearance, ...settings } = draft
   void appearance
@@ -116,8 +119,9 @@ export function useSettingsHistory(snapshot: Snapshot, send: Send) {
     const old = current.current
     const next = structuredClone(old.present)
     update(next)
-    if (JSON.stringify(next) !== JSON.stringify(old.present)) {
-      commit({ past: [...old.past.slice(-99), old.present], present: next, future: [] })
+    const present = shareTree(old.present, next)
+    if (present !== old.present) {
+      commit({ past: remember(old), present, future: [] })
     }
   }
   function undo() {
@@ -126,11 +130,11 @@ export function useSettingsHistory(snapshot: Snapshot, send: Send) {
   }
   function redo() {
     const old = current.current
-    if (old.future.length) commit({ past: [...old.past, old.present], present: old.future[0], future: old.future.slice(1) })
+    if (old.future.length) commit({ past: remember(old), present: old.future[0], future: old.future.slice(1) })
   }
   function reload() {
     saved.current = snapshot.Settings
-    commit({ past: [...current.current.past, current.current.present], present: createDraft(snapshot.Settings), future: [] })
+    commit({ past: remember(current.current), present: createDraft(snapshot.Settings), future: [] })
   }
   return { draft: history.present, change, undo, redo, reload, flush, saving, status, hasFailure, canUndo: !!history.past.length, canRedo: !!history.future.length }
 }

@@ -97,7 +97,7 @@ func ApplyScene(s Settings, scene Scene, available []string, current map[string]
 		t.Kelvin = QuantizeKelvin(t.Kelvin)
 		targets[id] = t
 	}
-	targets, err := ApplyCalibratedLink(next, available, targets, scene.Targets)
+	targets, err := applyCalibratedLinkOwned(next, available, targets, scene.Targets)
 	return next, targets, changed, err
 }
 

@@ -169,7 +169,11 @@ func SetLinked(s Settings, enabled bool, available []string, current map[string]
 // addressed nil means align on enable; non-nil limits alignment to scene/plan
 // devices. Scene/plan source wins if both pair members are addressed.
 func ApplyCalibratedLink(s Settings, available []string, current map[string]DisplayTarget, addressed map[string]DisplayTarget) (map[string]DisplayTarget, error) {
-	r := CloneTargets(current)
+	return applyCalibratedLinkOwned(s, available, CloneTargets(current), addressed)
+}
+
+// Scene and schedule reducers already own a detached target map.
+func applyCalibratedLinkOwned(s Settings, available []string, r, addressed map[string]DisplayTarget) (map[string]DisplayTarget, error) {
 	c := s.BrightnessLinkCalibration
 	if !s.Linked || c == nil || !c.MatchesPair(available) {
 		return r, nil
@@ -183,11 +187,11 @@ func ApplyCalibratedLink(s Settings, available []string, current map[string]Disp
 			}
 		}
 	}
-	t, ok := current[anchor]
+	t, ok := r[anchor]
 	if !ok {
 		return nil, fmt.Errorf("missing calibrated anchor target")
 	}
-	values, err := LinkedBrightness(s, available, current, anchor, t.Brightness)
+	values, err := LinkedBrightness(s, available, r, anchor, t.Brightness)
 	if err != nil {
 		return nil, err
 	}

@@ -34,7 +34,7 @@ export function SkyCanvas({ scene, reduced, settings }: { scene: StageKey; reduc
     const camera = new PerspectiveCamera(36, 16 / 9, .1, 250)
     camera.position.set(0, 0, 18)
     camera.updateMatrixWorld()
-    let stars: { object: Stars; material: ShaderMaterial; baseColors: Float32Array; count: number; style: string } | null = null
+    let stars: { object: Stars; material: ShaderMaterial; count: number; style: string } | null = null
     let particles: { object: Clouds; groups: Cloud[]; texture: ReturnType<TextureLoader['load']>; ready: boolean } | null = null
     let legacy: { object: Mesh; resources: ReturnType<typeof createLegacyMaterial> } | null = null
     let disposed = false
@@ -44,7 +44,6 @@ export function SkyCanvas({ scene, reduced, settings }: { scene: StageKey; reduc
     let lastTime = performance.now()
     let cloudTime = 0
     let starTime = 0
-    let lastBrightness = -1
 
     const releaseStars = () => {
       if (!stars) return
@@ -52,7 +51,6 @@ export function SkyCanvas({ scene, reduced, settings }: { scene: StageKey; reduc
       stars.object.geometry.dispose()
       stars.material.dispose()
       stars = null
-      lastBrightness = -1
       renderer.renderLists.dispose()
     }
     const releaseParticles = () => {
@@ -75,8 +73,12 @@ export function SkyCanvas({ scene, reduced, settings }: { scene: StageKey; reduc
       renderer.renderLists.dispose()
     }
 
+    let viewWidth = 0, viewHeight = 0
     const resize = () => {
       const width = Math.max(1, canvas.clientWidth), height = Math.max(1, canvas.clientHeight)
+      // setSize resets the drawing buffer even at identical dimensions.
+      if (width === viewWidth && height === viewHeight) return
+      viewWidth = width; viewHeight = height
       renderer.setSize(width, height, false)
       // Match the original image's centered cover crop, including fractional sizes.
       camera.aspect = width / height
@@ -94,16 +96,12 @@ export function SkyCanvas({ scene, reduced, settings }: { scene: StageKey; reduc
         const object = new Stars({ radius: 90, depth: 20, count, factor: 4, saturation: 0, fade: true, speed: 1 })
         const material = object.material as ShaderMaterial
         independentStarTwinkle(object.geometry, material)
-        stars = { object, material, baseColors: Float32Array.from(object.geometry.getAttribute('color').array), count, style: s.style }
+        stars = { object, material, count, style: s.style }
         world.add(object)
       }
-      if (stars) stars.material.uniforms.twinkleStrength.value = current.current.reduced ? 0 : s.twinkle / 100
-      if (stars && lastBrightness !== s.brightness) {
-        const starColors = stars.object.geometry.getAttribute('color')
-        const intensity = s.brightness / 100
-        for (let index = 0; index < starColors.array.length; index++) starColors.array[index] = stars.baseColors[index] * intensity
-        starColors.needsUpdate = true
-        lastBrightness = s.brightness
+      if (stars) {
+        stars.material.uniforms.twinkleStrength.value = current.current.reduced ? 0 : s.twinkle / 100
+        stars.material.uniforms.starBrightness.value = s.brightness / 100
       }
       const cloudsEnabled = hasClouds(activeSettings)
       if (!cloudsEnabled || c.style === 'legacy') releaseParticles()

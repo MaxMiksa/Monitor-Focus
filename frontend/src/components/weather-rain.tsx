@@ -8,12 +8,11 @@ export function RainAtmosphere({ rain, scene }: { rain: number; scene: StageKey 
   return <div className="weather-rain-atmosphere" data-night={scene === 'night'} aria-hidden="true" style={{ opacity: rainMoodOpacity(rain, scene === 'night') }} />
 }
 
-export function WeatherRainOverlay({ rain, reduced, settingsOpen, background = 'live' }: { rain: number; reduced: boolean; settingsOpen: boolean; background?: 'live' | 'classic' }) {
+export function WeatherRainOverlay({ rain, settingsOpen, background = 'live' }: { rain: number; settingsOpen: boolean; background?: 'live' | 'classic' }) {
   const host = useRef<HTMLDivElement>(null)
   const runtime = useRef<RainRuntime | null>(null)
   const current = useRef({ rain, settingsOpen, background })
   const [visible, setVisible] = useState(!document.hidden)
-  const active = rain > 0 && !reduced && visible
   useEffect(() => {
     const sync = () => setVisible(!document.hidden)
     document.addEventListener('visibilitychange', sync)
@@ -26,7 +25,7 @@ export function WeatherRainOverlay({ rain, reduced, settingsOpen, background = '
   }, [rain, settingsOpen, background])
   useEffect(() => {
     const element = host.current
-    if (!active || !element) return
+    if (!visible || !element) return
     let disposed = false
     const edges: RainEdges = []
     const pool = [{ left: 0, right: 0, top: 0 }, { left: 0, right: 0, top: 0 }]
@@ -63,6 +62,6 @@ export function WeatherRainOverlay({ rain, reduced, settingsOpen, background = '
       // The runtime owns a canvas, while React retains its host for later rain.
       element.replaceChildren()
     }
-  }, [active])
+  }, [visible])
   return <div ref={host} className="weather-rain-overlay" aria-hidden="true" />
 }

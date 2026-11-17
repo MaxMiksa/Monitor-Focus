@@ -236,6 +236,6 @@ func EvaluateSchedule(s Settings, state ScheduleState, now time.Time, available 
 		r.Targets[id] = target
 	}
 	var err error
-	r.Targets, err = ApplyCalibratedLink(r.Settings, available, r.Targets, p.Scene.Targets)
+	r.Targets, err = applyCalibratedLinkOwned(r.Settings, available, r.Targets, p.Scene.Targets)
 	return r, err
 }

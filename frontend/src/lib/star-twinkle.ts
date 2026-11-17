@@ -1,4 +1,4 @@
-import { Float32BufferAttribute } from 'three'
+import { BufferAttribute } from 'three'
 import type { BufferGeometry, ShaderMaterial } from 'three'
 
 // Keep pmndrs Stars' point geometry, fade and color pipeline. Its default
@@ -12,18 +12,20 @@ export function independentStarTwinkle(geometry: BufferGeometry, material: Shade
     attributes[index + 1] = .55 + random() * 1.65
     attributes[index + 2] = .25 + random() * .65
   }
-  geometry.setAttribute('twinkle', new Float32BufferAttribute(attributes, 3))
+  geometry.setAttribute('twinkle', new BufferAttribute(attributes, 3))
+  material.uniforms.starBrightness = { value: 1 }
   material.uniforms.twinkleStrength = { value: 0 }
   material.vertexShader = `
     uniform float time;
     uniform float twinkleStrength;
+    uniform float starBrightness;
     attribute float size;
     attribute vec3 twinkle;
     varying vec3 vColor;
     void main() {
       float wave = .5 + .5 * sin(time * twinkle.y + twinkle.x);
       float light = 1.0 - twinkleStrength * twinkle.z * wave;
-      vColor = color * light;
+      vColor = (color * starBrightness) * light;
       vec4 mvPosition = modelViewMatrix * vec4(position, 0.5);
       gl_PointSize = size * (30.0 / -mvPosition.z) * (3.0 + sin(100.0));
       gl_Position = projectionMatrix * mvPosition;

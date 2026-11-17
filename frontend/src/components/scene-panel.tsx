@@ -5,7 +5,7 @@ import { Sunrise, Sun, Sunset, Moon, Link2, Unlink2, Pause, Play, RotateCcw, Ale
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/lib/i18n-context'
 import { useSceneBarStyle, useStageStyle } from '@/lib/stage-preference'
-import { LiveSceneStage } from '@/components/live-scene-stage'
+import { ClassicSceneStage } from './classic-scene-stage'
 import { useWeatherRain } from '@/lib/weather'
 import { SkyEffects } from '@/components/sky-effects'
 import { RainAtmosphere, WeatherRainOverlay } from '@/components/weather-rain'
@@ -15,6 +15,7 @@ import { SKY_PREVIEW_EVENT, skyScenes, useSkyPreferences } from '@/lib/sky-prefe
 import type { Display, Snapshot } from '@/lib/control'
 import type { Send } from '@/App'
 
+const LiveSceneStage = lazy(() => import('@/components/live-scene-stage').then(module => ({ default: module.LiveSceneStage })))
 const WeatherPanel = lazy(() => import('./weather-panel').then(module => ({ default: module.WeatherPanel })))
 
 type SceneKey = 'morning' | 'midday' | 'dusk' | 'night'
@@ -22,7 +23,6 @@ export type StageKey = SceneKey
 const sceneKeys = ['morning', 'midday', 'dusk', 'night'] as const
 const sceneIcons = { morning: Sunrise, midday: Sun, dusk: Sunset, night: Moon }
 const sceneNames = { morning: '早晨', midday: '中午', dusk: '傍晚', night: '夜间' } as const
-const sceneAssets = Object.fromEntries(sceneKeys.map(key => [key, `/scenes/${key}.webp`])) as Record<StageKey, string>
 
 function sceneKeyByName(scene: { Name: string; DefaultName?: string }): SceneKey | null {
   const name = (scene.DefaultName ?? scene.Name).toLowerCase()
@@ -196,7 +196,7 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
   const { rain, weather, city } = useWeatherRain(true, weatherOpen && !settingsOpen, style === 'live' && seedMotion === 'wind' && !reduced)
   return <div className="scene-shell" data-scene={visibleStage} data-stage="live" data-background={style} data-settings-open={settingsOpen} data-weather-open={weatherOpen && !settingsOpen} data-raining={rain > 0}>
     <div className="scene-backdrop" aria-hidden="true">
-      {style === 'live' ? <LiveSceneStage key="live" scene={visibleStage} reduced={!!reduced} seedMotion={seedMotion} seedWind={weather.wind ?? null} seedRain={seedMotion === 'wind' ? Math.max(rain, weather.rain) : 0} /> : sceneKeys.map(key => <div key={key} className="scene-image" data-active={visibleStage === key} style={{ backgroundImage: `url('${sceneAssets[key]}')` }} />)}
+      {style === 'live' ? <Suspense fallback={null}><LiveSceneStage key="live" scene={visibleStage} reduced={!!reduced} seedMotion={seedMotion} seedWind={weather.wind ?? null} seedRain={seedMotion === 'wind' ? Math.max(rain, weather.rain) : 0} /></Suspense> : <ClassicSceneStage scene={visibleStage} />}
       <SkyEffects scene={visibleStage} reduced={!!reduced} settings={sky[visibleStage]} /><RainAtmosphere rain={rain} scene={visibleStage} />
     </div>
     <div className="window-drag-region" data-app-region="drag" aria-hidden="true" />
@@ -215,7 +215,7 @@ export function ScenePanel({ snapshot, send, error, openSettings, demo, settings
     {!settingsOpen && <AnimatePresence initial={false}>{weatherOpen && <Suspense key="weather" fallback={null}><WeatherPanel city={city} weather={weather} reduced={!!reduced} chooseLocation={chooseWeatherLocation} /></Suspense>}</AnimatePresence>}
     {children}
     <SettingsMorphSurface anchorKey={barStyle} />
-    <WeatherRainOverlay rain={rain} reduced={!!reduced} settingsOpen={settingsOpen} background={style} />
+    {rain > 0 && !reduced && <WeatherRainOverlay rain={rain} settingsOpen={settingsOpen} background={style} />}
     {missing && <p className="scene-missing" role="status">{missing}</p>}
     {demo && <p className="scene-demo" role="status">{t('此浏览器预览只展示界面，不控制硬件。')}</p>}
     {(snapshot.Warning || snapshot.Error || error || snapshot.Displays.some(d => d.Error)) && <p className="scene-alert" role="alert"><AlertCircle />{[snapshot.Warning, snapshot.Error, error, ...snapshot.Displays.filter(d => d.Error).map(d => d.Error)].filter(Boolean).join(' · ')}</p>}

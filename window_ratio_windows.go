@@ -29,17 +29,18 @@ const (
 )
 
 var (
-	kernel32Ratio   = windows.NewLazySystemDLL("kernel32.dll")
-	rtlMoveMemory   = kernel32Ratio.NewProc("RtlMoveMemory")
-	user32Ratio     = windows.NewLazySystemDLL("user32.dll")
-	getWindowRect   = user32Ratio.NewProc("GetWindowRect")
-	getClientRect   = user32Ratio.NewProc("GetClientRect")
-	getDpiForWindow = user32Ratio.NewProc("GetDpiForWindow")
-	setWindowPos    = user32Ratio.NewProc("SetWindowPos")
-	isZoomed        = user32Ratio.NewProc("IsZoomed")
-	showWindow      = user32Ratio.NewProc("ShowWindow")
-	ratioWindowMu   sync.Mutex
-	ratioWindowHWND uintptr
+	kernel32Ratio      = windows.NewLazySystemDLL("kernel32.dll")
+	rtlMoveMemory      = kernel32Ratio.NewProc("RtlMoveMemory")
+	user32Ratio        = windows.NewLazySystemDLL("user32.dll")
+	getForegroundPanel = user32Ratio.NewProc("GetForegroundWindow")
+	getWindowRect      = user32Ratio.NewProc("GetWindowRect")
+	getClientRect      = user32Ratio.NewProc("GetClientRect")
+	getDpiForWindow    = user32Ratio.NewProc("GetDpiForWindow")
+	setWindowPos       = user32Ratio.NewProc("SetWindowPos")
+	isZoomed           = user32Ratio.NewProc("IsZoomed")
+	showWindow         = user32Ratio.NewProc("ShowWindow")
+	ratioWindowMu      sync.Mutex
+	ratioWindowHWND    uintptr
 )
 
 type ratioRect struct{ Left, Top, Right, Bottom int32 }
@@ -68,6 +69,11 @@ func clearFixedRatioWindow(hwnd uintptr) {
 		ratioWindowHWND = 0
 	}
 	ratioWindowMu.Unlock()
+}
+
+func panelIsForeground(hwnd uintptr) bool {
+	foreground, _, _ := getForegroundPanel.Call()
+	return hwnd != 0 && foreground == hwnd
 }
 
 func isFixedRatioWindow(hwnd uintptr) bool {

@@ -1,3 +1,4 @@
+import { shareTree } from '@/lib/share-tree'
 import { useI18n } from '@/lib/i18n-context'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { MotionConfig } from 'motion/react'
@@ -61,7 +62,7 @@ export default function App() {
     const task = queue.current.then(async () => {
       try {
         const next = await request(command)
-        setSnapshot(next)
+        setSnapshot(previous => previous ? shareTree(previous, next) : next)
         if (next.SystemLanguage) setSystemLanguage(next.SystemLanguage)
         if (!initialized.current) {
           setLanguage(next.Settings.Language ?? 'system'); initialized.current = true
@@ -89,12 +90,17 @@ export default function App() {
   }, [send, demo])
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.defaultPrevented || event.key !== 'Escape' || event.repeat || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+      if (event.key !== 'Escape' || !document.hasFocus() || event.defaultPrevented || event.repeat || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
       if (document.querySelector('[data-slot=select-content]') || (event.target as HTMLElement | null)?.closest('[data-slot=select-content]')) return
       event.preventDefault()
       if (weatherOpen) { setWeatherOpen(false); return }
       if (settingsOpen) { setSettingsOpen(false); return }
-      void (async () => { if (!editor.current || await editor.current.flush()) windowCommand('window-close'); else setSettingsOpen(true) })()
+      void (async () => {
+        const saved = !editor.current || await editor.current.flush()
+        if (!document.hasFocus()) return
+        if (saved) windowCommand('window-close')
+        else setSettingsOpen(true)
+      })()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

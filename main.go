@@ -406,7 +406,11 @@ func (h *Host) receive(w application.Window, message string, origin *application
 				applyFixedRatioSize(uintptr(w.NativeWindow()), panelClientWide, panelClientHigh)
 				w.Center()
 			case "window-close":
-				w.Close()
+				// ESC may have waited for autosave or the UI queue. Never close a
+				// different (or replaced) panel after the foreground has changed.
+				if h.window == w && panelIsForeground(uintptr(w.NativeWindow())) {
+					w.Close()
+				}
 			}
 		})
 		return

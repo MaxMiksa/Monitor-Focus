@@ -64,18 +64,8 @@ func (b *Backend) Request(r Request) (map[string]any, error) {
 		return nil, fmt.Errorf("不支持的界面操作：%s", r.Action)
 	}
 	if b.mode == "native" {
-		state, err := b.native.Request(r)
-		if err != nil {
-			return nil, err
-		}
-		// Reply encoding happens after this lock is released. Return an owned copy.
-		data, err := json.Marshal(state)
-		if err != nil {
-			return nil, err
-		}
-		var result map[string]any
-		err = json.Unmarshal(data, &result)
-		return result, err
+		// Native snapshots are already detached under the native lock.
+		return b.native.Request(r)
 	}
 	settings := b.state["Settings"].(map[string]any)
 	switch r.Action {

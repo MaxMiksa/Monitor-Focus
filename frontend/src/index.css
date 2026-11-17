@@ -87,7 +87,7 @@ input[type=number] { width: 104px; }
 .live-stage-breath[data-scene=dusk] { opacity: .36; animation-duration: 12s; }
 .live-stage-breath[data-scene=night] { opacity: .16; animation-duration: 17s; }
 @keyframes live-breath { 0% { transform: translate3d(-.6%,.35%,0) scale(1.01); } 100% { transform: translate3d(.75%,-.25%,0) scale(1.03); } }
-.scene-image { position: absolute; inset: 0; opacity: 0; transition: opacity var(--stage-transition) cubic-bezier(.4,0,.2,1); background-repeat: no-repeat; background-size: cover; background-position: center center; }
+.scene-image { position: absolute; inset: 0; opacity: 0; transition: opacity var(--stage-transition) cubic-bezier(.4,0,.2,1); width: 100%; height: 100%; object-fit: cover; }
 .scene-image[data-active=true] { opacity: 1; }
 
 .scene-capsule, [data-slot=button].scene-capsule-button, .scene-capsule-button[data-active=true] { corner-shape: round!important; }

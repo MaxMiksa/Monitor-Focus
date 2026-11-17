@@ -451,7 +451,7 @@ func (n *NativeBackend) snapshot() (map[string]any, error) {
 		warning = &copy
 	}
 	language := "zh-CN"
-	data, err := json.Marshal(domain.Snapshot{Displays: n.snapshotStates(), Settings: n.settings.Clone(), FocusPaused: n.paused, Source: n.source, Warning: warning, SystemLanguage: &language, SolarTimes: n.schedule.Solar.Today(n.settings.SolarLocation, time.Now())})
+	data, err := json.Marshal(domain.Snapshot{Displays: n.snapshotStates(), Settings: n.settings, FocusPaused: n.paused, Source: n.source, Warning: warning, SystemLanguage: &language, SolarTimes: n.schedule.Solar.Today(n.settings.SolarLocation, time.Now())})
 	if err != nil {
 		return nil, err
 	}
