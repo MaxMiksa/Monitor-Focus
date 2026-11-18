@@ -43,20 +43,23 @@ export function parseDomesticWeather(value: unknown, city: WeatherCity, now = Da
     || typeof data.adcode !== 'string' || !/^\d{6}$/u.test(data.adcode)) throw new Error('Weather region mismatch')
   const at = reportTime(data.report_time, now), code = domesticCode(data.weather)
   if (!Number.isFinite(at) || now - at < -60_000 || now - at >= 30 * 60_000
-    || code === null || !temp(data.temperature) || !temp(data.feels_like)
-    || !finite(data.precipitation) || data.precipitation < 0) throw new Error('Invalid domestic observation')
+    || code === null || !temp(data.temperature)) throw new Error('Invalid domestic observation')
+  const apparent = temp(data.feels_like) ? data.feels_like : null
   const day = weatherDay(now, zone)
   const daily = (Array.isArray(data.forecast) ? data.forecast : []).map(record).find(item => item.date === day)
-  if (!daily || !temp(daily.temp_min) || !temp(daily.temp_max) || daily.temp_min > daily.temp_max) throw new Error('Invalid domestic daily forecast')
+  const range = daily && temp(daily.temp_min) && temp(daily.temp_max) && daily.temp_min <= daily.temp_max
+    ? { minimum: daily.temp_min, maximum: daily.temp_max } : { minimum: null, maximum: null }
   const hours = (Array.isArray(data.hourly_forecast) ? data.hourly_forecast : []).map(record)
     .map(item => ({ at: localTime(item.time), feels_like: item.feels_like, pop: item.pop, precip: item.precip, weather: item.weather }))
     .filter(item => item.at > now && item.at <= now + 3 * 3600_000)
   const complete = hours.length === 3 && hours[0].at - now <= 3600_000 && hours.every((hour, index) => temp(hour.feels_like)
     && finite(hour.pop) && hour.pop >= 0 && hour.pop <= 100 && finite(hour.precip) && hour.precip >= 0
     && domesticCode(hour.weather) !== null && (index === 0 || hour.at - hours[index - 1].at === 3600_000))
+  const apparentValues = complete ? hours.map(hour => hour.feels_like as number) : []
+  if (complete && apparent !== null) apparentValues.push(apparent)
   const outlook = complete ? {
-    low: Math.min(data.feels_like, ...hours.map(hour => hour.feels_like as number)),
-    high: Math.max(data.feels_like, ...hours.map(hour => hour.feels_like as number)),
+    low: Math.min(...apparentValues),
+    high: Math.max(...apparentValues),
     probability: Math.max(...hours.map(hour => hour.pop as number)), precipitation: Math.max(...hours.map(hour => hour.precip as number)),
     // Wind speed is not a gust measurement; leave the gust check unavailable.
     gust: null, codes: [...new Set([code, ...hours.map(hour => domesticCode(hour.weather)!)])],
@@ -64,13 +67,14 @@ export function parseDomesticWeather(value: unknown, city: WeatherCity, now = Da
   const minutes = new Date(now + 8 * 3600_000).getUTCHours() * 60 + new Date(now + 8 * 3600_000).getUTCMinutes()
   const clock = (value: unknown) => typeof value === 'string' && /^\d{2}:\d{2}$/u.test(value)
     ? Number(value.slice(0, 2)) * 60 + Number(value.slice(3)) : NaN
-  const sunrise = clock(daily.sunrise), sunset = clock(daily.sunset)
-  if (!(sunrise >= 0 && sunrise < sunset && sunset < 1440)) throw new Error('Missing domestic day boundary')
-  const details: WeatherDetails = { temperature: data.temperature, apparent: data.feels_like,
-    minimum: daily.temp_min, maximum: daily.temp_max, code, isDay: minutes >= sunrise && minutes < sunset,
+  const sunrise = clock(daily?.sunrise), sunset = clock(daily?.sunset)
+  const isDay = sunrise >= 0 && sunrise < sunset && sunset < 1440 ? minutes >= sunrise && minutes < sunset : null
+  const details: WeatherDetails = { temperature: data.temperature, apparent, ...range, code, isDay,
     timezone: zone, day, dayEndsAt: Date.parse(`${day}T00:00:00+08:00`) + 24 * 3600_000, outlook }
   if (!validWeatherDetails(details)) throw new Error('Invalid domestic details')
   // Forecast rain belongs only to advice. A dry current condition never starts rain.
   const rainy = [51, 61, 63, 65, 66, 80, 82, 95, 96].includes(code)
-  return { at, rain: rainy ? Math.min(1, .35 + data.precipitation * .13) : 0, details, wind: domesticWind(data) }
+  const amount = finite(data.precipitation) && data.precipitation >= 0 ? data.precipitation : null
+  const rain = !rainy ? 0 : amount === null ? .35 : Math.min(1, .35 + amount * .13)
+  return { at, rain, details, wind: domesticWind(data) }
 }

@@ -40,16 +40,31 @@ assert.equal(parsed.wind.estimated, true)
 assert.equal(details.travelAdvice(parsed.details), '未来几小时有雨，记得带伞')
 assert(domestic.parseDomesticWeather({ ...sample, weather: '小雨', precipitation: 1 }, city, now).rain > 0)
 for (const invalid of [{ ...sample, city: '鹤岗市' }, { ...sample, report_time: '31 分钟前发布' },
-  { ...sample, weather: '未知' }, { ...sample, forecast: [{ ...sample.forecast[0], date: '2026-11-15' }] }]) {
+  { ...sample, weather: '未知' }, { ...sample, temperature: null }]) {
   assert.throws(() => domestic.parseDomesticWeather(invalid, city, now))
 }
+const staleForecast = domestic.parseDomesticWeather({ ...sample, forecast: [{ ...sample.forecast[0], date: '2026-11-15' }] }, city, now)
+assert.equal(staleForecast.details.minimum, null)
+assert.equal(staleForecast.details.maximum, null)
+const core = { province: sample.province, city: sample.city, district: sample.district, adcode: sample.adcode,
+  weather: sample.weather, temperature: sample.temperature, report_time: sample.report_time }
+const coreSample = domestic.parseDomesticWeather(core, city, now)
+assert.equal(coreSample.details.temperature, 28)
+assert.equal(coreSample.details.apparent, null)
+assert.equal(coreSample.details.outlook, null)
+assert.equal(coreSample.details.isDay, null)
+assert.equal(coreSample.rain, 0)
+assert.equal(domestic.parseDomesticWeather({ ...core, weather: '阵雨' }, city, now).rain, .35)
+const hourlyOnly = domestic.parseDomesticWeather({ ...core, hourly_forecast: sample.hourly_forecast }, city, now)
+assert.equal(hourlyOnly.rain, 0)
+assert.equal(details.travelAdvice(hourlyOnly.details), '未来几小时有雨，记得带伞')
 assert.equal(domestic.parseDomesticWeather({ ...sample, hourly_forecast: [] }, city, now).details.outlook, null)
 assert.equal(domestic.domesticQuery(city), '深圳南山')
 assert.equal(domestic.domesticQuery({ ...city, name: 'London' }), null)
 
 const realNow = Date.now()
 const liveDay = details.weatherDay(realNow, 'Asia/Shanghai')
-const response = { ...sample, report_time: '刚刚发布', forecast: [{ ...sample.forecast[0], date: liveDay }] }
+const response = { ...core, report_time: '刚刚发布', forecast: [{ ...sample.forecast[0], date: liveDay }] }
 const originalFetch = globalThis.fetch
 let calls = []
 globalThis.fetch = async url => {
@@ -77,10 +92,11 @@ await assert.rejects(weather.namespace.currentWeather(city, cancelled.signal))
 assert.deepEqual(calls, ['uapis.cn'])
 globalThis.fetch = originalFetch
 assert.equal(weather.namespace.cached(city), null)
-console.log('PASS: cloudy current / rainy outlook, actual rain, region/date/freshness/unknown rejection, missing advice, domestic primary, fallback, cancellation, cache isolation')
+console.log('PASS: core-only primary, basic rain, stale forecast omission, missing advice, cloudy current / rainy outlook, region/freshness/unknown rejection, fallback, cancellation, cache isolation')
 if (process.argv.includes('--live')) {
   const live = await weather.namespace.currentWeather(city, new AbortController().signal)
   assert.equal(live.source, 'uapi')
   console.log(JSON.stringify({ source: live.source, code: live.details.code, temperature: live.details.temperature,
+    apparent: live.details.apparent, minimum: live.details.minimum, maximum: live.details.maximum,
     rain: live.rain, day: live.details.day, updatedAt: new Date(live.at).toISOString(), advice: details.travelAdvice(live.details) }))
 }

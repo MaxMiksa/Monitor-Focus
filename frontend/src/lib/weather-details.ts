@@ -2,7 +2,7 @@ import type { TextKey } from './i18n'
 
 export const weatherCodes = [0, 1, 2, 3, 45, 48, 51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 71, 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99]
 type Outlook = { low: number; high: number; probability: number; precipitation: number; gust: number | null; codes: number[] }
-export type WeatherDetails = { temperature: number; apparent: number; minimum: number; maximum: number; code: number; isDay: boolean; timezone: string; day: string; dayEndsAt: number; outlook: Outlook | null }
+export type WeatherDetails = { temperature: number; apparent: number | null; minimum: number | null; maximum: number | null; code: number; isDay: boolean | null; timezone: string; day: string; dayEndsAt: number; outlook: Outlook | null }
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
 const temperature = (value: unknown): value is number => finite(value) && value >= -100 && value <= 100
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' ? value as Record<string, unknown> : {}
@@ -12,9 +12,10 @@ export function weatherDay(at: number, timezone: string) {
 }
 export function validWeatherDetails(value: unknown): value is WeatherDetails {
   const details = record(value), outlook = record(details.outlook)
-  return temperature(details.temperature) && temperature(details.apparent) && temperature(details.minimum) && temperature(details.maximum)
-    && details.minimum <= details.maximum && finite(details.code) && weatherCodes.includes(details.code)
-    && typeof details.isDay === 'boolean' && typeof details.timezone === 'string' && typeof details.day === 'string' && finite(details.dayEndsAt)
+  return temperature(details.temperature) && (details.apparent === null || temperature(details.apparent))
+    && ((details.minimum === null && details.maximum === null) || (temperature(details.minimum) && temperature(details.maximum) && details.minimum <= details.maximum))
+    && finite(details.code) && weatherCodes.includes(details.code)
+    && (details.isDay === null || typeof details.isDay === 'boolean') && typeof details.timezone === 'string' && typeof details.day === 'string' && finite(details.dayEndsAt)
     && (details.outlook === null || (temperature(outlook.low) && temperature(outlook.high) && outlook.low <= outlook.high
       && finite(outlook.probability) && outlook.probability >= 0 && outlook.probability <= 100
       && finite(outlook.precipitation) && outlook.precipitation >= 0 && (outlook.gust === null || finite(outlook.gust) && outlook.gust >= 0)
