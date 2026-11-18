@@ -17,7 +17,7 @@ import type { StageKey } from '@/components/scene-panel'
 import { SortableList } from '@/components/sortable-list'
 import { DisplayRow, Level } from './display-controls'
 import type { Send } from '@/App'
-import { captureBehavior } from '@/lib/control'
+import { captureBehavior, defaultWindowShortcut } from '@/lib/control'
 import type { Display, EdgeWheelModifier, Snapshot } from '@/lib/control'
 
 const ScheduleChart = lazy(() => import('./schedule-chart').then(module => ({ default: module.ScheduleChart })))
@@ -26,6 +26,14 @@ const SkySettingsEditor = lazy(() => import('./sky-settings').then(module => ({ 
 
 export type SettingsEditorHandle = { flush: () => Promise<boolean>; chooseWeatherLocation: () => void }
 const tabs = ['displays', 'scenes', 'schedule', 'focus', 'general'] as const
+const shortcutModifiers = [8, 10, 9, 12, 11, 14, 13, 15, 2, 1, 3, 6, 5, 7].map(mask => ({
+  value: String(mask),
+  label: (['Alt', 'Ctrl', 'Shift', 'Win'] as const).filter((_, bit) => mask & (1 << bit)).join(' + '),
+}))
+const shortcutKeys = [
+  ...Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', label => ({ label, value: String(label.charCodeAt(0)) })),
+  ...Array.from({ length: 12 }, (_, i) => ({ label: `F${i + 1}`, value: String(112 + i) })),
+]
 export function SettingsEditor({ initialCitySearch, open, close, snapshot, send, ref }: { initialCitySearch?: boolean; open: boolean; close: () => void; snapshot: Snapshot; send: Send; ref: Ref<SettingsEditorHandle> }) {
   const { progress } = useSettingsMorph()
   const { t, sceneName, setLanguage, displayName, message: translateMessage } = useI18n()
@@ -43,6 +51,7 @@ export function SettingsEditor({ initialCitySearch, open, close, snapshot, send,
   const navigation = useRef<HTMLElement>(null)
   const [weatherSearch, setWeatherSearch] = useState<WeatherSearchDraft>({ query: '', editing: !!initialCitySearch })
   const { draft, change, undo, redo, reload, flush, saving, status, hasFailure, canUndo, canRedo } = useSettingsHistory(snapshot, send)
+  const shortcut = draft.WindowShortcut ?? defaultWindowShortcut
   const weatherCity = draft.appearance.weather.city
   const solarLocation = weatherCity ? { Name: weatherCity.name, Latitude: weatherCity.latitude, Longitude: weatherCity.longitude } : draft.SolarLocation ?? null
   const chooseCity = () => { setPage('general'); setSkyOpen(false); setWeatherSearch(value => ({ ...value, editing: true })) }
@@ -114,6 +123,14 @@ export function SettingsEditor({ initialCitySearch, open, close, snapshot, send,
       </div>
       <div className="settings-function-group">
       <div className="form-row"><label htmlFor="startup">{t('登录后自动启动')}</label><Switch id="startup" checked={draft.LaunchOnStartup} onCheckedChange={on => change(s => { s.LaunchOnStartup = on })} /></div>
+      <div className="form-row"><label htmlFor="window-shortcut">{t('窗口快捷键')}</label><Switch id="window-shortcut" checked={shortcut.Enabled} onCheckedChange={Enabled => change(s => { s.WindowShortcut = { ...shortcut, Enabled } })} /></div>
+      <div className="form-row" role="group" aria-label={t('窗口快捷键组合')}>
+        <label htmlFor="window-shortcut-modifiers">{t('组合键')}</label>
+        <div className="shortcut-keys">
+          <Select id="window-shortcut-modifiers" value={String(shortcut.Modifiers)} onValueChange={value => change(s => { s.WindowShortcut = { ...shortcut, Modifiers: Number(value) } })} options={shortcutModifiers} />
+          <Select aria-label={t('主键')} value={String(shortcut.Key)} onValueChange={value => change(s => { s.WindowShortcut = { ...shortcut, Key: Number(value) } })} options={shortcutKeys} />
+        </div>
+      </div>
       <div className="form-row"><label htmlFor="edge-brightness">{t('顶部滚轮调节亮度')}</label><Switch id="edge-brightness" checked={draft.TopEdgeBrightnessEnabled ?? false} onCheckedChange={on => change(s => { s.TopEdgeBrightnessEnabled = on })} /></div>
       <div className="form-row"><label htmlFor="edge-volume">{t('底部滚轮调节音量')}</label><Switch id="edge-volume" checked={draft.BottomEdgeVolumeEnabled ?? false} onCheckedChange={on => change(s => { s.BottomEdgeVolumeEnabled = on })} /></div>
       <div className="form-row"><label htmlFor="edge-modifier">{t('色温／应用音量按键')}</label><Select id="edge-modifier" value={draft.EdgeWheelModifier ?? 'alt'} onValueChange={value => change(s => { s.EdgeWheelModifier = value as EdgeWheelModifier })} options={[{ value: 'alt', label: 'Alt' }, { value: 'ctrl', label: 'Ctrl' }, { value: 'shift', label: 'Shift' }]} /></div>

@@ -9,7 +9,9 @@ export interface PlanPoint { TimeKind?: 'fixed' | 'sunrise' | 'sunset'; OffsetMi
 export interface TemperatureBrightnessPoint { Kelvin: number; ReferenceBrightness: number; CompensatedBrightness: number }
 export interface BrightnessLinkCalibration { SourceId: string; TargetId: string; Points: { Source: number; Target: number }[] }
 export type EdgeWheelModifier = 'alt' | 'ctrl' | 'shift'
-export interface Settings extends SceneBehavior { SolarLocation?: SolarLocation; SchemaVersion: number; Revision: number; Language: Language; KeepSecondaryAwakeOnFullscreen: boolean; FocusDelaySeconds: number; ScheduleEnabled: boolean; ScheduleTransitionMinutes?: number; LaunchOnStartup: boolean; TopEdgeBrightnessEnabled: boolean; BottomEdgeVolumeEnabled: boolean; EdgeWheelModifier: EdgeWheelModifier; Scenes: Scene[]; Schedule: PlanPoint[]; TemperatureBrightnessCalibrations?: Record<string, { Points: TemperatureBrightnessPoint[] }>; BrightnessLinkCalibration?: BrightnessLinkCalibration | null }
+export interface WindowShortcut { Enabled: boolean; Modifiers: number; Key: number }
+export const defaultWindowShortcut: WindowShortcut = { Enabled: true, Modifiers: 8, Key: 87 }
+export interface Settings extends SceneBehavior { SolarLocation?: SolarLocation; SchemaVersion: number; Revision: number; Language: Language; KeepSecondaryAwakeOnFullscreen: boolean; FocusDelaySeconds: number; ScheduleEnabled: boolean; ScheduleTransitionMinutes?: number; LaunchOnStartup: boolean; WindowShortcut: WindowShortcut; TopEdgeBrightnessEnabled: boolean; BottomEdgeVolumeEnabled: boolean; EdgeWheelModifier: EdgeWheelModifier; Scenes: Scene[]; Schedule: PlanPoint[]; TemperatureBrightnessCalibrations?: Record<string, { Points: TemperatureBrightnessPoint[] }>; BrightnessLinkCalibration?: BrightnessLinkCalibration | null }
 export interface Snapshot { SolarTimes?: SolarTimes; Displays: Display[]; Settings: Settings; FocusPaused: boolean; Source: string; Error: string | null; Warning?: string | null; SystemLanguage?: string | null }
 export interface Request { SolarLocation?: SolarLocation; Action: string; Id?: string; Value?: number; Settings?: Settings }
 
@@ -51,7 +53,7 @@ export async function request(Request: Request): Promise<Snapshot> {
 }
 // The window keeps one fixed 16:9 aspect ratio on both pages; no resize request.
 export function resizePanel(_settings: boolean) {}
-export function windowCommand(command: 'window-minimise' | 'window-maximise' | 'window-close') {
+export function windowCommand(command: 'window-minimise' | 'window-maximise' | 'window-close' | 'window-shortcut-close' | 'window-shortcut-cancel') {
   void wailsRuntime?.then(runtime => runtime.System.invoke(JSON.stringify({ Id: crypto.randomUUID(), Request: { Action: command } })))
 }
 // Explicit preview only; never substitute demo data when hardware requests fail.
@@ -60,7 +62,7 @@ export const preview: Snapshot = {
     { Id: 'preview-external', Name: 'AOC U27G4', Brightness: 22, CanAdjust: true, CanAdjustColor: true, Kelvin: 4600, Error: null, IsPrimary: true },
     { Id: 'preview-internal', Name: '笔记本屏幕', Brightness: 52, CanAdjust: true, CanAdjustColor: true, Kelvin: 4600, Error: null, IsPrimary: false },
   ],
-  Settings: { SchemaVersion: 1, Revision: 0, Language: 'system', Linked: false, LinkWeights: {}, FocusEnabled: false, ControlledDisplayIds: null, KeepSecondaryAwakeOnFullscreen: true, FocusDelaySeconds: 180, ScheduleEnabled: false, LaunchOnStartup: false, TopEdgeBrightnessEnabled: false, BottomEdgeVolumeEnabled: false, EdgeWheelModifier: 'alt',
+  Settings: { SchemaVersion: 1, Revision: 0, Language: 'system', Linked: false, LinkWeights: {}, FocusEnabled: false, ControlledDisplayIds: null, KeepSecondaryAwakeOnFullscreen: true, FocusDelaySeconds: 180, ScheduleEnabled: false, LaunchOnStartup: false, WindowShortcut: defaultWindowShortcut, TopEdgeBrightnessEnabled: false, BottomEdgeVolumeEnabled: false, EdgeWheelModifier: 'alt',
     Scenes: ['早晨', '中午', '傍晚', '夜间'].map((Name, i) => ({ Id: `preview-${i}`, Name, DefaultName: Name, Behavior: { Linked: false, LinkWeights: {}, FocusEnabled: false, ControlledDisplayIds: null }, Targets: { 'preview-external': { Brightness: [30, 37, 22, 10][i], Kelvin: [5600, 6200, 4600, 3200][i] }, 'preview-internal': { Brightness: [60, 67, 52, 25][i], Kelvin: [5600, 6200, 4600, 3300][i] } } })), Schedule: [{ MinuteOfDay: 360, SceneId: 'preview-0', TransitionMinutes: 30 }, { MinuteOfDay: 720, SceneId: 'preview-1', TransitionMinutes: 30 }, { MinuteOfDay: 1080, SceneId: 'preview-2', TransitionMinutes: 30 }, { MinuteOfDay: 1260, SceneId: 'preview-3', TransitionMinutes: 30 }] },
   FocusPaused: false, Source: '时间计划 · 傍晚', Error: null,
 }

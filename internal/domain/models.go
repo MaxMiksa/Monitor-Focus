@@ -30,6 +30,7 @@ type Settings struct {
 	SolarLocation                     *SolarLocation `json:",omitempty"`
 	ScheduleTransitionMinutes         *int           `json:",omitempty"`
 	LaunchOnStartup                   bool
+	WindowShortcut                    WindowShortcut
 	TopEdgeBrightnessEnabled          bool
 	BottomEdgeVolumeEnabled           bool
 	EdgeWheelModifier                 string
@@ -96,7 +97,8 @@ func DefaultSettings() Settings {
 	return Settings{SchemaVersion: 1, Language: "system", LinkWeights: map[string]float64{},
 		TemperatureBrightnessCalibrations: map[string]TemperatureBrightnessCalibration{},
 		KeepSecondaryAwakeOnFullscreen:    true, FocusDelaySeconds: 180, EdgeWheelModifier: "alt",
-		Scenes: []Scene{}, Schedule: []PlanPoint{}}
+		WindowShortcut: WindowShortcut{Enabled: true, Modifiers: 8, Key: 'W'},
+		Scenes:         []Scene{}, Schedule: []PlanPoint{}}
 }
 
 // UnmarshalJSON supplies the same missing-field defaults as C# initializers.

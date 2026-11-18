@@ -179,6 +179,17 @@ func (n *NativeBackend) available() []string {
 func (n *NativeBackend) configureDesktop() error {
 	return n.configureDesktopSettings(n.settings)
 }
+
+func (n *NativeBackend) configureWindowShortcut(s domain.WindowShortcut) error {
+	if n.desktop == nil || n.togglePanel == nil {
+		return nil
+	}
+	if !s.Enabled {
+		s.Key = 0
+	}
+	return n.desktop.ConfigureWindowShortcut(s.Key, s.Modifiers, n.togglePanel)
+}
+
 func (n *NativeBackend) configureDesktopSettings(settings domain.Settings) error {
 	if n.desktop == nil {
 		return nil
@@ -202,18 +213,31 @@ func (n *NativeBackend) saveSettings(next domain.Settings) error {
 	if err := n.configureDesktopSettings(next); err != nil {
 		return err
 	}
+	shortcutChanged := next.WindowShortcut != n.settings.WindowShortcut
+	rollbackInput := func() error {
+		err := n.configureDesktop()
+		if shortcutChanged {
+			err = errors.Join(err, n.configureWindowShortcut(n.settings.WindowShortcut))
+		}
+		return err
+	}
+	if shortcutChanged {
+		if err := n.configureWindowShortcut(next.WindowShortcut); err != nil {
+			return errors.Join(err, rollbackInput())
+		}
+	}
 	var startupBefore *startup.State
 	if n.production && next.LaunchOnStartup != n.settings.LaunchOnStartup {
 		state, err := startup.Snapshot()
 		if err != nil {
-			return errors.Join(err, n.configureDesktop())
+			return errors.Join(err, rollbackInput())
 		}
 		executable, err := os.Executable()
 		if err == nil {
 			err = startup.Configure(executable, next.LaunchOnStartup)
 		}
 		if err != nil {
-			return errors.Join(err, n.configureDesktop())
+			return errors.Join(err, rollbackInput())
 		}
 		startupBefore = &state
 	}
@@ -222,7 +246,7 @@ func (n *NativeBackend) saveSettings(next domain.Settings) error {
 		if startupBefore != nil {
 			err = errors.Join(err, startup.Restore(*startupBefore))
 		}
-		return errors.Join(err, n.configureDesktop())
+		return errors.Join(err, rollbackInput())
 	}
 	n.schedule = domain.ReconcileSchedule(n.schedule, n.settings, saved)
 	n.settings = saved

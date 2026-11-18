@@ -20,6 +20,9 @@ func Validate(s Settings) error {
 	if s.EdgeWheelModifier != "alt" && s.EdgeWheelModifier != "ctrl" && s.EdgeWheelModifier != "shift" {
 		return fmt.Errorf("unsupported edge wheel modifier")
 	}
+	if err := s.WindowShortcut.validate(); err != nil {
+		return err
+	}
 	if s.FocusDelaySeconds < 0 || s.FocusDelaySeconds > 600 {
 		return fmt.Errorf("focus delay must be 0–600 seconds")
 	}

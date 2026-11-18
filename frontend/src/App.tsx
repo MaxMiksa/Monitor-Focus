@@ -89,6 +89,18 @@ export default function App() {
     return () => { clearTimeout(initial); clearInterval(timer) }
   }, [send, demo])
   useEffect(() => {
+    let closing = false
+    async function closeFromShortcut() {
+      if (closing) return
+      closing = true
+      const saved = !editor.current || await editor.current.flush()
+      windowCommand(saved ? 'window-shortcut-close' : 'window-shortcut-cancel')
+      if (!saved) { setSettingsOpen(true); closing = false }
+    }
+    window.addEventListener('monitor-focus-close-panel', closeFromShortcut)
+    return () => window.removeEventListener('monitor-focus-close-panel', closeFromShortcut)
+  }, [])
+  useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key !== 'Escape' || !document.hasFocus() || event.defaultPrevented || event.repeat || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
       if (document.querySelector('[data-slot=select-content]') || (event.target as HTMLElement | null)?.closest('[data-slot=select-content]')) return

@@ -55,18 +55,20 @@ type Reply struct {
 	Error    string `json:",omitempty"`
 }
 type Host struct {
-	app        *application.App
-	window     *application.WebviewWindow
-	backend    *Backend
-	mode       string
-	dev        bool
-	inspect    bool
-	production bool
-	mu         sync.Mutex
-	opened     time.Time
-	serial     int
-	logfile    *os.File
-	dispatch   *dispatcher
+	app                  *application.App
+	window               *application.WebviewWindow
+	backend              *Backend
+	mode                 string
+	dev                  bool
+	inspect              bool
+	production           bool
+	mu                   sync.Mutex
+	opened               time.Time
+	serial               int
+	panelReady           bool
+	shortcutClosePending bool
+	logfile              *os.File
+	dispatch             *dispatcher
 }
 
 func main() {
@@ -257,6 +259,13 @@ func main() {
 				})
 			}
 			backend.native.production = *production
+			if *production && !*panelOnly {
+				backend.native.togglePanel = host.togglePanel
+				if err := backend.native.configureWindowShortcut(backend.native.settings.WindowShortcut); err != nil {
+					host.record("window-shortcut-error", map[string]any{"error": err.Error()})
+					backend.native.warning = "窗口快捷键启用失败：" + err.Error()
+				}
+			}
 		}
 		host.dispatch = newDispatcher(backend.Request, host.record)
 		ipc, err = host.serveIPC()
@@ -314,6 +323,22 @@ func (h *Host) control(action string) {
 		h.app.Quit()
 	}
 }
+func (h *Host) togglePanel() {
+	application.InvokeAsync(func() {
+		w := h.window
+		if w == nil || w.IsMinimised() {
+			h.record("window-shortcut-open", nil)
+			h.open()
+		} else if h.panelReady {
+			h.record("window-shortcut-close-request", nil)
+			h.shortcutClosePending = true
+			w.ExecJS("window.dispatchEvent(new Event('monitor-focus-close-panel'))")
+		} else {
+			w.Close()
+		}
+	})
+}
+
 func (h *Host) open() {
 	application.InvokeSync(func() {
 		if h.window != nil {
@@ -325,6 +350,8 @@ func (h *Host) open() {
 			return
 		}
 		h.opened = time.Now()
+		h.panelReady = false
+		h.shortcutClosePending = false
 		h.serial++
 		serial := h.serial
 		url := "/?language=zh-CN"
@@ -392,7 +419,7 @@ func (h *Host) receive(w application.Window, message string, origin *application
 		return
 	}
 	switch msg.Request.Action {
-	case "window-minimise", "window-maximise", "window-close":
+	case "window-minimise", "window-maximise", "window-close", "window-shortcut-close", "window-shortcut-cancel":
 		application.InvokeAsync(func() {
 			switch msg.Request.Action {
 			case "window-minimise":
@@ -411,6 +438,13 @@ func (h *Host) receive(w application.Window, message string, origin *application
 				if h.window == w && panelIsForeground(uintptr(w.NativeWindow())) {
 					w.Close()
 				}
+			case "window-shortcut-close", "window-shortcut-cancel":
+				if h.window == w && h.shortcutClosePending {
+					h.shortcutClosePending = false
+					if msg.Request.Action == "window-shortcut-close" {
+						w.Close()
+					}
+				}
 			}
 		})
 		return
@@ -419,6 +453,11 @@ func (h *Host) receive(w application.Window, message string, origin *application
 		application.InvokeAsync(func() { w.Center() })
 		return
 	case "ui-ready":
+		application.InvokeAsync(func() {
+			if h.window == w {
+				h.panelReady = true
+			}
+		})
 		h.record("ui-ready", map[string]any{"serial": h.serial, "elapsedMs": time.Since(h.opened).Milliseconds()})
 		return
 	case "ui-trace":

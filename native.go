@@ -44,6 +44,7 @@ type NativeBackend struct {
 	lastColorCheck  time.Time
 	trace           func(string, map[string]any)
 	production      bool
+	togglePanel     func()
 	notify          func(string)
 	nextAudioNotice time.Time
 	lastDesktop     desktop.DesktopState

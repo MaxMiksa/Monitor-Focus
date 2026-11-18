@@ -54,6 +54,7 @@ type Controller struct {
 
 	// Everything below is accessed only on the native thread.
 	window, hook, feedbackWindow uintptr
+	keyboard                     windowShortcut
 	options                      Options
 	displays                     []Display
 	accumulator                  accumulator
@@ -144,6 +145,7 @@ func (c *Controller) run(ready chan<- error) {
 			break
 		}
 		c.runJobs()
+		c.keyboard.deliver()
 		c.processRaw()
 		for count := 0; count < 64 && !c.closing.Load(); count++ {
 			r, _, _ := peekMessage.Call(uintptr(unsafe.Pointer(&msg)), 0, 0, 0, 1)
@@ -414,7 +416,7 @@ func (c *Controller) Close() error {
 
 func (c *Controller) cleanup() error {
 	var result error
-	result = errors.Join(result, c.removeHook())
+	result = errors.Join(result, c.removeHook(), c.keyboard.remove())
 	c.hideFeedback()
 	killTimer.Call(c.window, scopeTimer)
 	for _, h := range c.masks {

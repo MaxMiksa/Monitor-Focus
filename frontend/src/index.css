@@ -262,6 +262,7 @@ input[type=number] { width: 104px; }
 .settings-function-group { position: relative; min-width: 0; align-self: stretch; }
 .settings-function-group + .settings-function-group::before { content: ''; position: absolute; left: -22px; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.16); pointer-events: none; }
 .settings-function-group .form-row > :not(label) { flex-shrink: 0; }
+.shortcut-keys { display: flex; align-items: center; gap: 6px; }
 .settings-function-group input[type=number] { width: 94px; }
 .settings-function-group .form-row:last-child { border-bottom: 0; }
 .weather-city-row > button { max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
