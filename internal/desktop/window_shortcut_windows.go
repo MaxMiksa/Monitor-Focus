@@ -8,7 +8,10 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-var keyboardCallback = windows.NewCallback(keyboardProc)
+var (
+	keyboardCallback = windows.NewCallback(keyboardProc)
+	sendInput        = u32.NewProc("SendInput")
+)
 
 // Adjacent bits track the left/right keys for Alt, Ctrl, Shift and Win.
 var modifierKeys = [...]uint32{0xa4, 0xa5, 0xa2, 0xa3, 0xa0, 0xa1, 0x5b, 0x5c}
@@ -31,7 +34,7 @@ func (c *Controller) ConfigureWindowShortcut(key, modifiers uint8, toggle func()
 			return s.remove()
 		}
 		if s.hook == 0 {
-			for _, proc := range []*windows.LazyProc{asyncKey, nextHook, consoleSession, getSystemMetrics} {
+			for _, proc := range []*windows.LazyProc{asyncKey, nextHook, consoleSession, getSystemMetrics, sendInput} {
 				if err := proc.Find(); err != nil {
 					return err
 				}
@@ -80,6 +83,32 @@ type keyboardInput struct {
 	Extra                  uintptr
 }
 
+// INPUT with the KEYBDINPUT member and the remaining MOUSEINPUT union padding.
+type keyboardOutput struct {
+	Type     uint32
+	Keyboard struct {
+		Key, Scan   uint16
+		Flags, Time uint32
+		Extra       uintptr
+	}
+	_ [8]byte
+}
+
+func maskModifierTap() {
+	const (
+		inputKeyboard = 1
+		keyUp         = 2
+		noMapping     = 0xff
+	)
+	var events [2]keyboardOutput
+	for i := range events {
+		events[i].Type = inputKeyboard
+		events[i].Keyboard.Key = noMapping
+	}
+	events[1].Keyboard.Flags = keyUp
+	sendInput.Call(uintptr(len(events)), uintptr(unsafe.Pointer(&events[0])), unsafe.Sizeof(events[0]))
+}
+
 func keyboardProc(code int32, msg uintptr, data *keyboardInput) uintptr {
 	if code == 0 {
 		if owner, ok := threadOwners.Load(windows.GetCurrentThreadId()); ok {
@@ -125,6 +154,11 @@ func (c *Controller) handleShortcut(input keyboardInput) bool {
 		return false
 	}
 	s.held = key
+	if s.modifiers&(8|1) != 0 {
+		// Windows still sees the modifier. Mark it as used before its release
+		// can open Start (Win) or activate the focused app's menu (Alt).
+		maskModifierTap()
+	}
 	s.pending++
 	// Run the host callback after the keyboard hook returns.
 	windows.SetEvent(c.wake)
