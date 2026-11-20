@@ -131,7 +131,7 @@ func enumOccupancy(hwnd, token uintptr) uintptr {
 		return 1
 	}
 	switch windows.UTF16ToString(class[:]) {
-	case "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd", "MonitorsFocus.Desktop.Native.Go":
+	case "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd", "MyScreen.Desktop.Native":
 		return 1
 	}
 	var cloaked uint32

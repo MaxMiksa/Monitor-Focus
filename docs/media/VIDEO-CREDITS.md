@@ -1,7 +1,5 @@
 # MyScreen — promo credits
 
-The video uses the former name, Monitors Focus.
-
 - **Background music:** [Friday Morning — Kevin MacLeod (Incompetech)](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100224)
 - **Audio in the demo player:** [Somewhere Sunny — Kevin MacLeod (Incompetech)](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100493)
 

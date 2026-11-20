@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 # One snapshot, with explicit ownership. Shared working sets are not additive.
 $all = @(Get-CimInstance Win32_Process)
 $owner = @($all | Where-Object ProcessId -eq $OwnerId)
-if ($owner.Count -ne 1 -or $owner[0].Name -ne 'MonitorsFocus.Go.exe') { throw 'Expected one identified MonitorsFocus owner.' }
+if ($owner.Count -ne 1 -or $owner[0].Name -ne 'MyScreen.exe') { throw 'Expected one identified MyScreen owner.' }
 $ids = [Collections.Generic.HashSet[int]]::new()
 [void]$ids.Add($OwnerId)
 do {

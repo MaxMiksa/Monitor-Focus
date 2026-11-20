@@ -1,5 +1,5 @@
 {
-  "name": "monitors-focus-rain-preview",
+  "name": "myscreen-rain-preview",
   "private": true,
   "type": "module",
   "scripts": { "build:ui": "vite build --config ui.config.js", "start": "vite --host 127.0.0.1 --port 5194 --strictPort" },

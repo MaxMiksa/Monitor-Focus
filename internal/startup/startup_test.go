@@ -91,7 +91,7 @@ func cloneKeys(r *memoryRegistry) map[string]map[string]Value {
 }
 func seeded() *memoryRegistry {
 	r := memory()
-	r.seed(RunKey, AppName, 2, stringBytes(`"C:\old\MonitorsFocus.exe" --center --background`))
+	r.seed(RunKey, AppName, 2, stringBytes(`"C:\old\MyScreen.exe" --center --background`))
 	r.seed(ApprovedKey, AppName, binaryType, []byte{3, 0, 0, 0, 9, 8, 7, 6, 5, 4, 3, 2})
 	r.seed(RunKey, LegacyName, stringType, stringBytes(`"C:\old\legacy.exe"`))
 	r.seed(ApprovedKey, LegacyName, binaryType, []byte{3, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8})
@@ -105,7 +105,7 @@ func executable(t *testing.T) string {
 	if err := os.Mkdir(dir, 0700); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(dir, "Monitors Focus.exe")
+	path := filepath.Join(dir, "My Screen.exe")
 	if err := os.WriteFile(path, []byte("test fixture; never executed"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -152,6 +152,40 @@ func TestCommandValidationBeforeRegistryAccess(t *testing.T) {
 			t.Fatal("invalid path touched registry")
 		}
 	}
+}
+
+func TestPreviousNameMigratesWithoutLosingApproval(t *testing.T) {
+	r := seeded()
+	path := executable(t)
+	oldApproval := []byte{2, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8}
+	delete(r.keys[RunKey], AppName)
+	delete(r.keys[ApprovedKey], AppName)
+	r.seed(RunKey, priorName, stringType, stringBytes("previous path"))
+	r.seed(ApprovedKey, priorName, binaryType, oldApproval)
+	m := NewManager(r)
+	before, err := m.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Configure(path, true); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(r.keys[ApprovedKey][AppName].Data, oldApproval) {
+		t.Fatal("existing approval changed")
+	}
+	for _, key := range []string{RunKey, ApprovedKey} {
+		if _, exists := r.keys[key][priorName]; exists {
+			t.Fatal("previous name survived")
+		}
+	}
+	if err := m.Restore(before); err != nil {
+		t.Fatal(err)
+	}
+	after, err := m.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectState(t, after, before)
 }
 
 func TestEnableSingleEntryApprovalAndExactRestore(t *testing.T) {
@@ -291,7 +325,7 @@ func TestApprovalAbsentOrWrongTypeCorrected(t *testing.T) {
 
 func TestSnapshotReadFailureDoesNotMutate(t *testing.T) {
 	path := executable(t)
-	for read := 1; read <= 4; read++ {
+	for read := 1; read <= len(entries); read++ {
 		r := seeded()
 		original := cloneKeys(r)
 		r.failRead = read
@@ -362,7 +396,7 @@ func TestVerificationFailuresRollBack(t *testing.T) {
 		r := seeded()
 		original := cloneKeys(r)
 		if reason == "read-error" {
-			r.failRead = 5
+			r.failRead = len(entries) + 1
 		} else {
 			r.ignoreMutation = 1
 		}

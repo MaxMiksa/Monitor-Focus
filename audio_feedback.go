@@ -2,8 +2,8 @@ package main
 
 import (
 	"errors"
-	"monitorsfocus/internal/audio"
-	"monitorsfocus/internal/desktop"
+	"myscreen/internal/audio"
+	"myscreen/internal/desktop"
 )
 
 // No session is different from a real session whose mixer level is zero.

@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 Push-Location $root
 try {
-    if (@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'MonitorsFocus.Go.exe' -and $_.ExecutablePath -eq "$root\build\MonitorsFocus.Go.exe" }).Count) { throw '正常退出构建目录中的程序后再构建；现用发布包可继续运行。' }
+    if (@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'MyScreen.exe' -and $_.ExecutablePath -eq "$root\build\MyScreen.exe" }).Count) { throw '正常退出构建目录中的程序后再构建；现用发布包可继续运行。' }
     $all=[Diagnostics.Stopwatch]::StartNew()
     $version=& $Pnpm --version
     if ($LASTEXITCODE -or $version.Trim() -ne '12.16.1') { throw 'pnpm 12.16.1 required' }
@@ -40,11 +40,11 @@ try {
         if ($LASTEXITCODE) { throw 'Go vet failed' }
     }
     $native=[Diagnostics.Stopwatch]::StartNew()
-    & $Go build "-overlay=$overlay" -mod=readonly -trimpath -tags production -ldflags '-s -w -H windowsgui -X main.adoptedBuild=true' -o build/MonitorsFocus.Go.exe .
+    & $Go build "-overlay=$overlay" -mod=readonly -trimpath -tags production -ldflags '-s -w -H windowsgui -X main.adoptedBuild=true' -o build/MyScreen.exe .
     if ($LASTEXITCODE) { throw 'Windows production build failed' }
-    & "$PSScriptRoot/Set-ExecutableIcon.ps1" -Executable "$root/build/MonitorsFocus.Go.exe"
+    & "$PSScriptRoot/Set-ExecutableIcon.ps1" -Executable "$root/build/MyScreen.exe"
     # Verify the stripped executable's writable image section; no symbols needed.
-    $stream=[IO.File]::OpenRead((Join-Path $root 'build/MonitorsFocus.Go.exe'))
+    $stream=[IO.File]::OpenRead((Join-Path $root 'build/MyScreen.exe'))
     try {
         $reader=[IO.BinaryReader]::new($stream)
         $stream.Position=0x3c;$header=$reader.ReadInt32()
@@ -59,12 +59,12 @@ try {
         }
         if($null -eq $dataBytes -or $dataBytes -ge 8MB){throw 'Large writable image section remains; entropy overlay needs review.'}
     } finally { $stream.Dispose() }
-    @{At=(Get-Date).ToString('o');Go=$goVersion;Pnpm=$version.Trim();FrontendBuildMs=$web.Elapsed.TotalMilliseconds;GoBuildMs=$native.Elapsed.TotalMilliseconds;TotalMs=$all.Elapsed.TotalMilliseconds;Checks=[bool]$Check;ExecutableBytes=(Get-Item build/MonitorsFocus.Go.exe).Length} | ConvertTo-Json -Compress | Add-Content build/build-timing.jsonl
-    Write-Host "$root\build\MonitorsFocus.Go.exe"
+    @{At=(Get-Date).ToString('o');Go=$goVersion;Pnpm=$version.Trim();FrontendBuildMs=$web.Elapsed.TotalMilliseconds;GoBuildMs=$native.Elapsed.TotalMilliseconds;TotalMs=$all.Elapsed.TotalMilliseconds;Checks=[bool]$Check;ExecutableBytes=(Get-Item build/MyScreen.exe).Length} | ConvertTo-Json -Compress | Add-Content build/build-timing.jsonl
+    Write-Host "$root\build\MyScreen.exe"
     if ($Package) {
         $output = Join-Path $root ('build/packages/' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
         New-Item -ItemType Directory -Path $output | Out-Null
-        Copy-Item -LiteralPath "$root/build/MonitorsFocus.Go.exe" -Destination $output
-        Write-Host "Package: $output\MonitorsFocus.Go.exe"
+        Copy-Item -LiteralPath "$root/build/MyScreen.exe" -Destination $output
+        Write-Host "Package: $output\MyScreen.exe"
     }
 } finally { Pop-Location }

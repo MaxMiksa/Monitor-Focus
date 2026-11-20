@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"monitorsfocus/internal/audio"
+	"myscreen/internal/audio"
 	"os"
 	"time"
 )

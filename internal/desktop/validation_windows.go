@@ -173,7 +173,7 @@ func validationFeedback(c *Controller, l *validationLog, state DesktopState) boo
 		}
 	}
 	before := foreground()
-	f := Feedback{Label: "Monitors Focus", Value: "Native validation", Percent: 5, Display: target.Display}
+	f := Feedback{Label: "MyScreen", Value: "Native validation", Percent: 5, Display: target.Display}
 	showErr := c.ShowFeedback(f)
 	var first, second validationWindow
 	var firstHWND, secondHWND uintptr

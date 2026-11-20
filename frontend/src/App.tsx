@@ -104,8 +104,8 @@ export default function App() {
       windowCommand(saved ? 'window-shortcut-close' : 'window-shortcut-cancel')
       if (!saved) { setSettingsOpen(true); closing = false }
     }
-    window.addEventListener('monitor-focus-close-panel', closeFromShortcut)
-    return () => window.removeEventListener('monitor-focus-close-panel', closeFromShortcut)
+    window.addEventListener('myscreen-close-panel', closeFromShortcut)
+    return () => window.removeEventListener('myscreen-close-panel', closeFromShortcut)
   }, [])
   useEffect(() => {
     function onKey(event: KeyboardEvent) {

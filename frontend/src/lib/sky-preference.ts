@@ -9,9 +9,9 @@ export type SkySettings = {
 export const cloudLayouts = ['original', 'scatter', 'stagger', 'arc', 'depth'] as const
 export type CloudLayout = typeof cloudLayouts[number]
 export type SkyPreferences = Record<StageKey, SkySettings>
-export const SKY_KEY = 'monitors-focus.' + 'sky-settings-v1'
-export const SKY_EVENT = 'monitors-focus-sky'
-export const SKY_PREVIEW_EVENT = 'monitors-focus-sky-preview'
+export const SKY_KEY = 'myscreen.' + 'sky-settings-v1'
+export const SKY_EVENT = 'myscreen-sky'
+export const SKY_PREVIEW_EVENT = 'myscreen-sky-preview'
 export const skyScenes = ['morning', 'midday', 'dusk', 'night'] as const
 
 function percent(value: unknown, fallback: number) {

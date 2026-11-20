@@ -7,9 +7,9 @@ import type { WeatherWind } from './weather-wind'
 
 export type WeatherCity = { id: number; name: string; detail: string; latitude: number; longitude: number }
 export type WeatherPreference = { enabled: boolean; city: WeatherCity | null }
-export const WEATHER_KEY = 'monitors-focus.weather'
-const CACHE_KEY = 'monitors-focus.weather-current-v2'
-const CHANGE = 'monitors-focus-weather'
+export const WEATHER_KEY = 'myscreen.weather'
+const CACHE_KEY = 'myscreen.weather-current-v2'
+const CHANGE = 'myscreen-weather'
 const REFRESH = 15 * 60_000
 const MAX_AGE = 30 * 60_000
 type Sample = { city: string; at: number; rain: number; source: 'uapi' | 'open-meteo'; details?: WeatherDetails | null; wind?: WeatherWind | null }

@@ -137,7 +137,7 @@ func TestNativeLayoutsAndHRESULT(t *testing.T) {
 
 // Explicit read-only smoke test. Never creates streams or calls any setter.
 func TestNativeReadOnly(t *testing.T) {
-	if os.Getenv("MONITORSFOCUS_AUDIO_READONLY") != "1" {
+	if os.Getenv("MYSCREEN_AUDIO_READONLY") != "1" {
 		t.Skip("opt-in native read-only probe")
 	}
 	c, err := New()

@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 
 export type StageStyle = 'live' | 'classic'
 export type SceneBarStyle = 'text' | 'icon' | 'both'
-export const STAGE_STYLE_KEY = 'monitors-focus.background-style'
-const OBSOLETE_STAGE_KEY = 'monitors-focus.stage-style'
-export const SCENE_BAR_STYLE_KEY = 'monitors-focus.scene-bar-style'
-export const AIR_OPACITY_KEY = 'monitors-focus.air-opacity'
-export const PREFERENCE_EVENT = 'monitors-focus-preferences'
-export const AIR_OPACITY_EVENT = 'monitors-focus-air-opacity'
+export const STAGE_STYLE_KEY = 'myscreen.background-style'
+const OBSOLETE_STAGE_KEY = 'myscreen.stage-style'
+export const SCENE_BAR_STYLE_KEY = 'myscreen.scene-bar-style'
+export const AIR_OPACITY_KEY = 'myscreen.air-opacity'
+export const PREFERENCE_EVENT = 'myscreen-preferences'
+export const AIR_OPACITY_EVENT = 'myscreen-air-opacity'
 
 export function readAirOpacity(): number {
   try {

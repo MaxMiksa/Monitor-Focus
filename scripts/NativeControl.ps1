@@ -1,5 +1,6 @@
-function Send-Go([hashtable]$Request=@{Action='snapshot'},[switch]$AllowError) {
-    $pipe=[IO.Pipes.NamedPipeClientStream]::new('.',"MonitorsFocus.Go.Control.$env:USERNAME.native",[IO.Pipes.PipeDirection]::InOut,[IO.Pipes.PipeOptions]::Asynchronous)
+function Send-Go([hashtable]$Request=@{Action='snapshot'},[switch]$AllowError,[switch]$Legacy) {
+    $channel=if($Legacy){'MonitorsFocus.Go.Control'}else{'MyScreen.Control'}
+    $pipe=[IO.Pipes.NamedPipeClientStream]::new('.',"$channel.$env:USERNAME.native",[IO.Pipes.PipeDirection]::InOut,[IO.Pipes.PipeOptions]::Asynchronous)
     try {
         $pipe.Connect(3000)
         $writer=[IO.StreamWriter]::new($pipe,[Text.UTF8Encoding]::new($false),1024,$true)

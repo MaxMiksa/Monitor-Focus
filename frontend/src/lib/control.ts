@@ -25,7 +25,7 @@ const runtimeURL = '/wails/runtime.js'
 const wailsRuntime = inWails ? import(/* @vite-ignore */ runtimeURL) : null
 export const isDesktop = inWails
 const pending = new Map<string, { resolve: (value: Snapshot) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>; started: number; action: string }>()
-window.addEventListener('monitor-focus-reply', ((event: CustomEvent<Reply>) => {
+window.addEventListener('myscreen-reply', ((event: CustomEvent<Reply>) => {
   const data = event.detail, task = pending.get(data.Id)
   if (!task) return
   clearTimeout(task.timer); pending.delete(data.Id)

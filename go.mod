@@ -1,4 +1,4 @@
-module monitorsfocus
+module myscreen
 
 go 1.27.3
 

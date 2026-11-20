@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"monitorsfocus/internal/win32"
+	"myscreen/internal/win32"
 	"os"
 	"path/filepath"
 	"slices"
@@ -89,7 +89,7 @@ func runHardwareCheck() {
 			}
 		}
 	}
-	if err = native.worker.ValidateRecovery(filepath.Join(os.Getenv("LOCALAPPDATA"), "Monitors-Focus-Go-Dev", "validation-colors.json"), os.Stdout); err != nil {
+	if err = native.worker.ValidateRecovery(filepath.Join(profilePath(false), "validation-colors.json"), os.Stdout); err != nil {
 		failed = true
 		emit("recovery-validation-failed", map[string]any{"error": err.Error()})
 	}

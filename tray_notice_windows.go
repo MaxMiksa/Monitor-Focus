@@ -7,7 +7,7 @@ import (
 	"unsafe"
 )
 
-const trayWindowClass = "MonitorsFocus.Go.Host"
+const trayWindowClass = "MyScreen.Host"
 
 // Wails 3.1.0 creates our single tray (UID 1) on a message-only window.
 // Modify only an existing icon owned by this process; never create another icon.

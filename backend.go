@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"monitorsfocus/internal/domain"
+	"myscreen/internal/domain"
 	"os"
 	"path/filepath"
 	"sync"

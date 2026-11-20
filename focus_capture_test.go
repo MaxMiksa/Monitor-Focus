@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows"
-	"monitorsfocus/internal/desktop"
-	"monitorsfocus/internal/domain"
+	"myscreen/internal/desktop"
+	"myscreen/internal/domain"
 )
 
 func TestFocusCaptureFailureAndRecovery(t *testing.T) {

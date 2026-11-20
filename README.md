@@ -2,17 +2,17 @@
 
 English · [简体中文](README.zh-CN.md)
 
+**Let your screens keep pace with you.**
+
 Adjust your displays on Windows. Press `Win + W` to open the panel, or use the mouse wheel at the edge of your screen without opening it.
 
 **Lightweight tray app: about 19 MB of memory.** This is from one Task Manager reading; actual usage varies. Closing the panel frees its interface while edge scrolling, scheduled transitions, and Focus keep working.
 
 <h2 align="center">Product demo</h2>
 
-https://github.com/user-attachments/assets/321a01ba-bdf3-41b0-b84b-7249cf1c68eb
+https://github.com/user-attachments/assets/46796fce-cb31-4fc6-9784-16fe55aac08f
 
 1 min 37 sec · English narration · [Video credits](docs/media/VIDEO-CREDITS.md)
-
-This video was recorded before the rename and uses the former name, Monitors Focus.
 
 The screenshots show the app with sample display and weather data.
 
@@ -61,5 +61,5 @@ In **General → Stars and clouds**, adjust how bright the stars are and how muc
 <h2 align="center">Install and launch</h2>
 
 - Requires Windows 10/11 x64 and Microsoft Edge WebView2 Runtime. External-display brightness control requires DDC/CI support and must be enabled on the monitor. Color temperature control requires a compatible SDR display.
-- Build the current Go version from source: run `./scripts/build.ps1 -Check -Package`, then launch the generated `MonitorsFocus.Go.exe`. You can enable launch on sign-in under **General**. Older GitHub releases do not reflect the current Go version.
+- Build the current Go version from source: run `./scripts/build.ps1 -Check -Package`, then launch the generated `MyScreen.exe`. You can enable launch on sign-in under **General**. Older GitHub releases do not reflect the current Go version.
 - [Product guide (Chinese)](docs/PRODUCT.md) · [Build and update notes (Chinese)](docs/DEVELOPMENT.md) · [Project status (Chinese)](docs/STATUS.md) · [License](LICENSE)

@@ -2,7 +2,7 @@
 
 ## 一、当前项目各功能的完成状态
 
-**对外名称**：窗口、托盘和中英文 README 统一为 MyScreen。沿用原程序文件名、配置目录、校准和自启标识；本机正式包已验收窗口名称，设置、显示目标、专注和唯一自启均保留。
+**更名**：GitHub 仓库、窗口、托盘、程序文件和中英文 README 统一为 MyScreen。本机已验证设置文件内容不变、显示目标与专注状态保留、仅有新自启项。旧配置留作回退。
 
 **窗口快捷键**已部署至 `20261118-145620-787`。在 Windows 桌面模拟两种松键顺序，`Win + W` 均可开关窗口且不弹出开始菜单，单按 `Win` 仍可打开开始菜单。自定义组合、长按与禁用见 `build/diagnostics/window-shortcut-20261118-input.json`。本次桌面验收及部署见 `build/diagnostics/window-shortcut-start-20261118-*`。
 
@@ -64,7 +64,7 @@
 
 **界面与设置**：16:9 同机位换光／四图换肤、飞絮、三种场景栏、Noto Sans/SC、统一玻璃下拉、自动保存／冲突留草稿及跨页撤销／重做已实现。窗口默认 1168×657、最小 1024×576，设置面板固定 958×526 并居中；字号正文／按钮 16px、小标题 18px、标题 26px；四场景同屏，38px 内容定宽玻璃胶囊及分组布局保留。天空采用 pmndrs 成熟组件：两种星空、三种云彩，独立开关及数量／亮度／闪烁／浓度／速度，四场景分别记忆；通用页「天空效果」仅预览画面，不改硬件。已验证中英布局、正式资源无报错、样式切换、数量归零、撤销、重开保存及场景独立记忆；截图见 `build/diagnostics/sky-effects/`。统一正式版已通过五次开关面板验证，关闭后的 15 个采样均无 WebView2 残留；长期运行、全部减少动态效果及渲染失败路径未实测。
 
-**配置、启动与边界**：原子保存留 `.bak`，Revision 冲突留草稿，坏文件／迁移／初始化失败不改写自启；支持中英与跟随系统；关闭面板释放 WebView2，退出卸载钩子、撤回补光、恢复原色并保留最新亮度。唯一自启 `MonitorsFocus.Go.exe --mode native --hardware --production --background`；桥校验 Origin／动作白名单，无通用执行或生产 Node／业务 HTTP 后端。
+**配置、启动与边界**：原子保存留 `.bak`，Revision 冲突留草稿，坏文件／迁移／初始化失败不改写自启；支持中英与跟随系统；关闭面板释放 WebView2，退出卸载钩子、撤回补光、恢复原色并保留最新亮度。唯一自启 `MyScreen.exe --mode native --hardware --production --background`；桥校验 Origin／动作白名单，无通用执行或生产 Node／业务 HTTP 后端。
 
 **入口**：[中文 README](../README.zh-CN.md) · [English README](../README.md) · [产品说明](PRODUCT.md) · [开发与构建](DEVELOPMENT.md)；当前部署证据 `build/diagnostics/myscreen-brand-20261121-update.json`；包保留策略见 `scripts/Remove-OldPackages.ps1`。
 

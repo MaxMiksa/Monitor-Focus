@@ -14,7 +14,7 @@ import (
 	"github.com/Microsoft/go-winio"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"golang.org/x/sys/windows"
-	"monitorsfocus/internal/win32"
+	"myscreen/internal/win32"
 )
 
 type ipcServer struct {
@@ -31,7 +31,7 @@ func (h *Host) serveIPC() (*ipcServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	listener, err := winio.ListenPipe(`\\.\pipe\MonitorsFocus.Go.Control.`+os.Getenv("USERNAME")+"."+h.mode, &winio.PipeConfig{SecurityDescriptor: "D:P(A;;GA;;;" + user.User.Sid.String() + ")", InputBufferSize: 65536, OutputBufferSize: 65536})
+	listener, err := winio.ListenPipe(`\\.\pipe\MyScreen.Control.`+os.Getenv("USERNAME")+"."+h.mode, &winio.PipeConfig{SecurityDescriptor: "D:P(A;;GA;;;" + user.User.Sid.String() + ")", InputBufferSize: 65536, OutputBufferSize: 65536})
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func (h *Host) handleIPC(conn net.Conn) {
 	}
 }
 func nativeCall(mode, payload string) error {
-	conn, err := winio.DialPipe(`\\.\pipe\MonitorsFocus.Go.Control.`+os.Getenv("USERNAME")+"."+mode, nil)
+	conn, err := winio.DialPipe(`\\.\pipe\MyScreen.Control.`+os.Getenv("USERNAME")+"."+mode, nil)
 	if err != nil {
 		return err
 	}

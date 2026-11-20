@@ -11,7 +11,7 @@ $server=[Diagnostics.Process]::Start($info)
 try {
     Start-Sleep -Milliseconds 700
     if ($server.HasExited) { throw 'Vite failed to start; check 5183 ownership' }
-    $app=Start-Process "$root\build\MonitorsFocus.Go.exe" -ArgumentList '--mode mock --hardware=false --production=false --dev' -PassThru
+    $app=Start-Process "$root\build\MyScreen.exe" -ArgumentList '--mode mock --hardware=false --production=false --dev' -PassThru
     $app.WaitForExit()
 } finally {
     if (-not $server.HasExited) { $server.StandardInput.WriteLine('exit');$server.StandardInput.Flush();if (-not $server.WaitForExit(10000)) { Write-Warning "Vite has not exited yet: PID $($server.Id)" } }

@@ -1,12 +1,12 @@
 param([Parameter(Mandatory)][string]$Executable)
 $ErrorActionPreference='Stop'
-if(-not ('MonitorsFocusResources' -as [type])) {
+if(-not ('MyScreenResources' -as [type])) {
 Add-Type @'
 using System;
 using System.IO;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-public static class MonitorsFocusResources {
+public static class MyScreenResources {
  [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern IntPtr BeginUpdateResource(string file,bool delete);
  [DllImport("kernel32.dll",SetLastError=true)] static extern bool UpdateResource(IntPtr update,IntPtr type,IntPtr name,ushort language,byte[] data,uint size);
  [DllImport("kernel32.dll",SetLastError=true)] static extern bool EndUpdateResource(IntPtr update,bool discard);
@@ -33,4 +33,4 @@ public static class MonitorsFocusResources {
 '@
 }
 $assetRoot=Join-Path (Split-Path $PSScriptRoot -Parent) 'frontend/public'
-[MonitorsFocusResources]::Apply((Resolve-Path -LiteralPath $Executable).Path,(Join-Path $assetRoot 'app.ico'),(Join-Path $assetRoot 'app-white.ico'))
+[MyScreenResources]::Apply((Resolve-Path -LiteralPath $Executable).Path,(Join-Path $assetRoot 'app.ico'),(Join-Path $assetRoot 'app-white.ico'))

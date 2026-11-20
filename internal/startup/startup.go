@@ -1,4 +1,4 @@
-// Package startup manages only this user's MonitorsFocus login startup values.
+// Package startup manages only this user's MyScreen login startup values.
 // Nothing runs automatically. Configure must be called only after successful
 // configuration loading/validation, never after a corrupt-config fallback.
 package startup
@@ -20,7 +20,8 @@ import (
 const (
 	RunKey             = `Software\Microsoft\Windows\CurrentVersion\Run`
 	ApprovedKey        = `Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run`
-	AppName            = "MonitorsFocus"
+	AppName            = "MyScreen"
+	priorName          = "MonitorsFocus"
 	LegacyName         = "MonitorsFocus.ControlCenter"
 	Arguments          = "--mode native --hardware --production --background"
 	stringType  uint32 = 1 // REG_SZ
@@ -46,12 +47,18 @@ type Registry interface {
 
 type entry struct{ key, name string }
 
-var entries = [4]entry{{RunKey, AppName}, {ApprovedKey, AppName}, {RunKey, LegacyName}, {ApprovedKey, LegacyName}}
+const priorApproval = 3
 
-// State is an opaque snapshot of the four owned values, not entire shared keys.
+var entries = [...]entry{
+	{RunKey, AppName}, {ApprovedKey, AppName},
+	{RunKey, priorName}, {ApprovedKey, priorName},
+	{RunKey, LegacyName}, {ApprovedKey, LegacyName},
+}
+
+// State is an opaque snapshot of the owned values, not entire shared keys.
 // Restore preserves other applications' entries. A zero State is invalid.
 type State struct {
-	values [4]Value
+	values [len(entries)]Value
 	valid  bool
 }
 
@@ -130,6 +137,9 @@ func (m *Manager) Configure(executablePath string, enabled bool) error {
 	if enabled {
 		next.values[0] = Value{KeyExists: true, Exists: true, Type: stringType, Data: stringBytes(command)}
 		approved := before.values[1]
+		if !approved.Exists && before.values[priorApproval].Exists {
+			approved = before.values[priorApproval]
+		}
 		// Explorer owns this key. If absent, a new Run value is enabled by
 		// Windows; do not create an undocumented approval key just for us.
 		if approved.KeyExists {

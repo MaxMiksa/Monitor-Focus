@@ -2,17 +2,17 @@
 
 简体中文 · [English](README.md)
 
+**让你的屏幕跟上你的节奏。**
+
 在 Windows 上，让每块屏幕都舒服一点。用 `Win + W` 呼出面板，也可以不打开它，直接在屏幕边缘滚动鼠标。
 
 **轻量后台：常驻进程约 19 MB。** 这是本机任务管理器的一次实测，实际占用因环境而异。关掉面板会释放界面，边缘滚轮、定时渐变和专注仍可继续工作。
 
 <h2 align="center">产品演示</h2>
 
-https://github.com/user-attachments/assets/321a01ba-bdf3-41b0-b84b-7249cf1c68eb
+https://github.com/user-attachments/assets/46796fce-cb31-4fc6-9784-16fe55aac08f
 
 1 分 37 秒 · 英文旁白 · [配乐与素材署名](docs/media/VIDEO-CREDITS.md)
-
-视频录制于更名前，片中使用原名 Monitors Focus。
 
 以下为软件界面截图，显示器和天气数据用于演示。
 
@@ -61,5 +61,5 @@ https://github.com/user-attachments/assets/321a01ba-bdf3-41b0-b84b-7249cf1c68eb
 <h2 align="center">安装和启动</h2>
 
 - 需要 Windows 10/11 x64 和 Microsoft Edge WebView2 Runtime。外接屏的亮度调节需要显示器支持并启用 DDC/CI；色温调节适用于兼容的 SDR 屏幕。
-- 当前 Go 版从源码构建。执行 `./scripts/build.ps1 -Check -Package`，然后运行生成的 `MonitorsFocus.Go.exe`。首次打开后，可在「通用」开启登录自启。GitHub 上的历史发布包不代表当前版本。
+- 当前 Go 版从源码构建。执行 `./scripts/build.ps1 -Check -Package`，然后运行生成的 `MyScreen.exe`。首次打开后，可在「通用」开启登录自启。GitHub 上的历史发布包不代表当前版本。
 - [产品说明](docs/PRODUCT.md) · [开发与更新](docs/DEVELOPMENT.md) · [验证状态](docs/STATUS.md) · [许可证](LICENSE)

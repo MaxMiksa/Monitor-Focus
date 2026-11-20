@@ -26,7 +26,7 @@ actualUI.onScene(scene => {
 })
 const frameBudget = 30
 try {
-  const remembered = JSON.parse(localStorage.getItem('monitors-focus.rain-gallery-choice') || 'null')
+  const remembered = JSON.parse(localStorage.getItem('myscreen.rain-gallery-choice') || 'null')
   const index = presets.findIndex(preset => preset.id === remembered?.id)
   if (index >= 0 && Number.isFinite(remembered.intensity) && remembered.intensity >= 0 && remembered.intensity <= 100) {
     selected = index; amount = remembered.intensity / 100
@@ -317,7 +317,7 @@ $('#ui-mode').addEventListener('click', () => { uiEnabled = !uiEnabled; present(
 $('#choose').addEventListener('click', () => {
   saved = { id: presets[selected].id, name: presets[selected].name, intensity: Math.round(amount * 100) }
   // Preview choice is isolated from application weather/settings state.
-  localStorage.setItem('monitors-focus.rain-gallery-choice', JSON.stringify(saved))
+  localStorage.setItem('myscreen.rain-gallery-choice', JSON.stringify(saved))
   present()
 })
 function clean(value) { document.body.classList.toggle('clean-view', value); $('#restore').hidden = !value; $('#clean').setAttribute('aria-pressed', String(value)) }

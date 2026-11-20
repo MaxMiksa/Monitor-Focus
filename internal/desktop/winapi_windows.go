@@ -48,7 +48,7 @@ var (
 	threadOwners      sync.Map // thread ID -> *Controller; one shared hook trampoline.
 	classOnce         sync.Once
 	classErr          error
-	className         = windows.StringToUTF16Ptr("MonitorsFocus.Desktop.Native.Go")
+	className         = windows.StringToUTF16Ptr("MyScreen.Desktop.Native")
 	windowCallback    = windows.NewCallback(windowProc)
 	mouseCallback     = windows.NewCallback(mouseProc)
 )

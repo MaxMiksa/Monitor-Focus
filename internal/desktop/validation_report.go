@@ -40,7 +40,7 @@ func (l *validationLog) emit(r validationRecord) {
 	if l.writeErr != nil {
 		return
 	}
-	r.Schema = "monitorsfocus.desktop.validation.v1"
+	r.Schema = "myscreen.desktop.validation.v1"
 	r.Time = time.Now().UTC().Format(time.RFC3339Nano)
 	if err := l.encoder.Encode(r); err != nil {
 		l.writeErr = fmt.Errorf("write desktop validation JSONL: %w", err)

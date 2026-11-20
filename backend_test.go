@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"monitorsfocus/internal/domain"
+	"myscreen/internal/domain"
 	"os"
 	"testing"
 )

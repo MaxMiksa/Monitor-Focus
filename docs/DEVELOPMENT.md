@@ -14,7 +14,7 @@
 
 天气紧凑卡片以 `build/diagnostics/weather-compact/approved.png` 为视觉基准，外框 524×100 DIP、距顶 48；左栏第一行 SVG＋气温、第二行天气＋最低／最高温（不带「今日」），右栏穿衣／出行各一行。`weather-panel-summary` 禁止换行，温差不压缩；过长天气名称或建议单行省略，title 保留完整文字，不能用第三排撑高。24px 圆角、四边 16px 内缩，根网格伸展内框和分隔线，subgrid 共用两行中心；34px／500 气温、18px 天气、16px／400 建议，无新增画布／请求，按需加载、退出卸载不变。通用设置仍可换位置，空位置保留入口。`weather-two-rows/checks.json` 与截图复现用户的晴间多云／26°C／21–27°C，1024 DIP 中英均 100px 高、温差完整、两条建议各 24px 单行；中文天气文字完整，长英文建议可悬停查看。此为隔离测试天气而非实况。正式构建／lint、Go test／vet／PE 检查通过，部署见 `weather-two-rows-20261116-update.json`，保持目标、专注和唯一自启；未重复原生截图／长期内存验收。等距几何验收沿用 `weather-inset/checks.json`，核验内容内框与行中心，不声称字形轮廓逐像素等距。
 
-统一首页：`scene-panel.tsx` 仅有新版胶囊与设置入口，背景选择不再分叉控件、天空预览或天气能力；双机器只复用原四图与交叉淡入。`stage-preference.ts` 首次读取将旧 `monitors-focus.stage-style` 迁移至 `monitors-focus.background-style`，仅在新键不存在时继承选择，写入成功后删除旧键，不清空共享偏好／缓存。`wind-rain-runtime.js` 复用同一个雨画布与粒子上限，以底图原尺寸的 cover 投影计算单／双机器斜边交点，背景改变清掉旧水花并重算投影；双机器天空使用轻量 SVG 遮罩。`build/diagnostics/background-unification/` 保留正式构建日志、样式／偏好迁移／双机器命中／开关释放验收和截图，天气是测试数据；部署见 `background-unification-20261116-update.json`。原生构建沿用 `weather-location/native-source/source-overlay.json` 隔离在途硬件修改，未包含原型页修改；未验收长期运行。
+统一首页：单／双机器背景共用场景栏和天气能力。偏好改名时迁移旧存储键；新键已存在则保留新值。雨景复用画布与粒子上限，切换背景时清理旧水花并重新计算投影。
 
 首页天气卡片：`weather-panel.tsx` 按需加载、退出后卸载，使用本地彩色 SVG，无新增画布、轮询所有者或硬件动作；`App` 管理默认隐藏／Esc 优先级，首页导航保持设置／天气互斥并过滤按住 ↑ 的重复事件，仅未选地区时显示选择入口，其余从通用设置更换地区。卡片与设置共用玻璃材质变量和字体，天气字号按确认图独立还原。`weather-details.ts` 校验所选地点时区的今日最低／最高温及跨午夜未来三小时数据，规则生成建议；请求显式摄氏度／km/h，当前＋两天日界＋四个小时数据由原天气所有者一次读取，未来字段缺失则不给建议，不用全市坐标或旧日期数据凑数。仍兼容旧雨缓存；跨日触发刷新，失败回到正常重试间隔，不热循环；停用雨景且收起卡片时取消请求／清理计时。`build/diagnostics/weather-panel/` 保存确认布局、实时 API 样本、八项规则和浏览器验收、1024 DIP 英文／减少动态效果／旧舞台截图、原生 WebView2＋模拟核心键盘验收及正式构建日志；天气画面使用测试数据，不是南山实况。部署见 `build/diagnostics/weather-panel-20261116-update.json`；原生改动隔离沿用 `weather-location/native-source/source-overlay.json`，未加入其他任务的原生／原型页改动。
 
@@ -43,14 +43,14 @@ React/TypeScript → Wails 桥 → Go 宿主 / dispatcher
 ./scripts/Measure-NativeMemory.ps1 -Label <唯一标签>
 ```
 
-- `scripts/build.ps1` 是唯一正式构建入口：冻结安装前端、构建内嵌资源、下载锁定 Go 依赖；`-Check` 追加前端 lint、Go test 与 vet，最终校验 PE 可写段后生成 `build/MonitorsFocus.Go.exe`。`-Package` 另外复制到 `build/packages/时间戳/MonitorsFocus.Go.exe`，时间戳由脚本生成，不在文档写死。构建不部署、不提交、不发布；若正在运行 `build/MonitorsFocus.Go.exe`，须先正常退出再构建；从 `build/packages/` 运行的独立包可继续使用。
-- `scripts/Dev.ps1` 启动本地 Vite，并以独立 mock 模式打开 `build/MonitorsFocus.Go.exe`；不写硬件、不修改登录自启。启动前完成正式构建；浏览器预览带明确示例数据标识，不能把示例成功当作硬件成功。
+- `scripts/build.ps1` 是唯一正式构建入口：冻结安装前端、构建内嵌资源、下载锁定 Go 依赖；`-Check` 追加前端 lint、Go test 与 vet，最终校验 PE 可写段后生成 `build/MyScreen.exe`。`-Package` 另外复制到 `build/packages/时间戳/MyScreen.exe`，时间戳由脚本生成，不在文档写死。构建不部署、不提交、不发布；若正在运行 `build/MyScreen.exe`，须先正常退出再构建；从 `build/packages/` 运行的独立包可继续使用。
+- `scripts/Dev.ps1` 启动本地 Vite，并以独立 mock 模式打开 `build/MyScreen.exe`；不写硬件、不修改登录自启。启动前完成正式构建；浏览器预览带明确示例数据标识，不能把示例成功当作硬件成功。
 - `scripts/Update-NativeGo.ps1 -Executable <包exe>` 读取当前快照，通过认证 IPC 正常退出旧核心，启动新包、等待硬件就绪并恢复目标／专注状态，核对唯一自启项；失败时先排空新核心再尝试独占回退。只传稳定的包路径，不覆盖运行中的 exe；更新结果写入 `build/diagnostics/`。
 - `scripts/Measure-NativeMemory.ps1 -Label <唯一标签>` 对当前唯一 Go 核心做五轮面板开关，统计全部自有进程、Private Bytes、专用工作集、CPU 和可见窗口耗时，结果写入 `build/diagnostics/`。标签须唯一；可见窗口不等于渲染完成或可操作时间。
 - `scripts/Measure-OwnedProcessMemory.ps1 -OwnerId <PID>` 只读采一帧，按明确的 Go 核心收集后代进程，输出逐进程及合计的独占物理／私有提交和 GPU 归属计数；进程计数不完整时拒绝记录，GPU 计数不可用时明确标记。它不负责切换界面状态；设置是否展开、尺寸、DPI 和场景须由测试流程另行固定。
 - `scripts/NativeControl.ps1` 提供 `Send-Go` 函数，连接当前用户、同会话、ACL 限定的本地命名管道，用于运维脚本；命令行 `--call`、诊断与硬件验收入口均不是前端开放动作。
 
-正式 exe 无参数打开面板；`--background` 只启动托盘；唯一登录自启命令为 `MonitorsFocus.Go.exe --mode native --hardware --production --background`。`--production` 要求 `--mode native --hardware`，且不能与开发热加载共存。
+正式 exe 无参数打开面板；`--background` 只启动托盘；唯一登录自启命令为 `MyScreen.exe --mode native --hardware --production --background`。`--production` 要求 `--mode native --hardware`，且不能与开发热加载共存。
 
 ## 运行链路与安全边界
 
@@ -70,11 +70,11 @@ React/TypeScript → Wails 桥 → Go 宿主 / dispatcher
 
 ## 配置、场景与启动
 
-- 正式配置：`%LOCALAPPDATA%/Monitors-Focus-Go/native-settings.json`；颜色 journal 为同目录 `native-colors.json`；trace 为 `host-native.jsonl`，同一 Trace ID 贯穿界面接收、排队、硬件工作和回复。
+- 正式配置：`%LOCALAPPDATA%/MyScreen/native-settings.json`；颜色 journal 为同目录 `native-colors.json`；trace 为 `host-native.jsonl`，同一 Trace ID 贯穿界面接收、排队、硬件工作和回复。 首次启动将旧配置、校准及 WebView2 偏好与缓存复制至新目录，保留旧数据作回退，不复制旧诊断日志。更名兼容期继续与旧程序共用实例锁及硬件互斥锁。
 - `domain.Store` 需要显式路径，读取不创建文件；坏文件、未知 schema、非普通文件和权限错误直接返回，不用默认值覆盖。保存比较 `Revision`，仅在成功时递增并返回新副本，使用同目录同步临时文件和原子替换，保留上一版 `.bak`；冲突保留调用方草稿，清理临时文件。锁文件残留须人工核对，不自动夺取。
 - 显式迁移只继承已验证的旧版语言、专注延迟和自启偏好；先备份原始字节再首次写入，保留源文件。读取、迁移或核心初始化失败时，绝不按默认设置改动登录自启。
 - 场景在 `Targets` 之外保存行为字段；旧场景只在内存补齐，不立即改写磁盘。可选 `ScheduleTransitionMinutes` 仅保存统一时长偏好（包括空计划），编辑时同步各节点，旧配置不迁移覆盖；计划仍按节点时长和本地时钟求值，跨午夜连续；节点行为只应用一次，渐变期间不重复保存或重置专注。无关保存保留手动保持；行为已变化但持久化失败时不能接受返回状态为已提交。
-- `startup` 只在配置成功加载／校验后由正式宿主显式调用，维护唯一 `HKCU MonitorsFocus` 项并清理历史别名；操作前快照、逐项读回、失败按相反顺序恢复，保留其他应用条目与已有启用字节。
+- `startup` 只在配置成功加载／校验后由正式宿主显式调用，维护唯一 `HKCU MyScreen` 项并清理历史别名；操作前快照、逐项读回、失败按相反顺序恢复，保留其他应用条目与已有启用字节。
 - 正常退出保留最新正常亮度，卸载输入钩子与遮罩，撤回补光并恢复原色；非正式的原生硬件验收模式恢复到接管前现场；mock 只读写独立模拟配置，不接管硬件。不要让两个会写硬件的核心同时运行。
 
 ## 构建 overlay 与升级复核
@@ -99,7 +99,7 @@ Go 1.27.3 标准库 `crypto/internal/fips140/drbg` 的固定 32 MiB 可写静态
 
 - 飞絮由 `scripts/export-seed-patches.py` 离线制作局部补片，输出 `frontend/public/scenes/live/seed-sky-patches.png` 与 `frontend/src/lib/seed-patches.json`。不改原始 WebP；同一片元程序先补原位置，再从原图减去补片，搬移有符号细节，避免蓝色矩形边缘。10 个偏移量每次绘制计算一次，复用 80 字节数组，不逐像素算轨迹；独立 120 秒无缝时钟，不随场景切换重置。图集 RGB 上传数据 600 KiB，驱动实际内存另测；生成过程只依赖开发机 Python／Pillow／NumPy／OpenCV，产品不依赖它们。
 - 快捷面板的四颗按钮按场景名称显式映射早 / 中 / 傍晚 / 夜，不按目标小时就近取场景；无法识别的名称才按亮度兜底。浏览器示例数据与每日计划同步使用四个场景和四个节点。亮度滑条左端月亮、右端太阳，表示从暗到亮；更多控制只列出未映射到四颗按钮的场景。
-- 前端通过 Wails runtime 发送请求并等待 `monitor-focus-reply`；示例数据只在明确 `?preview=1` 的浏览器预览中出现，硬件请求失败不回退成演示成功。
+- 前端通过 Wails runtime 发送请求并等待 `myscreen-reply`；示例数据只在明确 `?preview=1` 的浏览器预览中出现，硬件请求失败不回退成演示成功。
 - `@fontsource-variable/noto-sans` 与 `noto-sans-sc` 提供离线可变字体，通过 index.css 的 @import 与全局 --font-sans 应用于文字、表单及图表。Unicode 分片 WOFF2 随 Vite 构建嵌入，只加载所需字形片；不请求远程字体。OFL 完整许可合入项目及分发 notices。
 - 品牌图形源为 `frontend/public/favicon.svg`（Lucide Sun–Moon，许可见 `THIRD_PARTY_NOTICES.md`，分发副本嵌入 `frontend/public/third-party-notices.txt`）。更改 SVG 后运行 `D:/Apps/python/python.exe scripts/export-icons.py`，用本机 CairoSVG/Pillow 派生透明底黑／白 ICO；普通构建无需 Python。`scripts/Set-ExecutableIcon.ps1` 在打包前写入 exe 的两组图标资源；`window_icon_windows.go` 按系统深浅色设置窗口大小图标和托盘图标。Windows 的 Wails `App.SetIcon` 实现为空，不能用它代替资源和 `WM_SETICON`。
 - `settings-editor.tsx` 是始终挂载的首页玻璃浮层，五个底部分类（当下默认）共享 `lib/settings-history.ts` 的草稿和历史。500 ms 防抖、串行保存、Revision 校验；稳定排序的内容指纹避免 Go/JS 字段顺序引起重复保存。保存期间的新改动继续排队，失败保留草稿；撤销／重做（含本地外观偏好）同样保存。Esc 关闭和首页场景请求先 flush，失败重新展开浮层。状态推送不抢焦点或覆盖未保存内容。

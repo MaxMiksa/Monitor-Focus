@@ -48,7 +48,7 @@ func newValidationWindow() (*validationWindow, error) {
 		defer windows.CloseHandle(stop)
 		w.threadID = windows.GetCurrentThreadId()
 		class := windows.StringToUTF16Ptr("STATIC")
-		title := windows.StringToUTF16Ptr("MonitorsFocus audio validation — silent")
+		title := windows.StringToUTF16Ptr("MyScreen audio validation — silent")
 		hwnd, _, callErr := user32.NewProc("CreateWindowExW").Call(0,
 			uintptr(unsafe.Pointer(class)), uintptr(unsafe.Pointer(title)), 0x00C00000,
 			100, 100, 380, 90, 0, 0, 0, 0)

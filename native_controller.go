@@ -9,15 +9,15 @@ import (
 	"path/filepath"
 	"time"
 
-	"monitorsfocus/internal/audio"
-	"monitorsfocus/internal/desktop"
-	"monitorsfocus/internal/domain"
-	"monitorsfocus/internal/startup"
-	"monitorsfocus/internal/win32"
+	"myscreen/internal/audio"
+	"myscreen/internal/desktop"
+	"myscreen/internal/domain"
+	"myscreen/internal/startup"
+	"myscreen/internal/win32"
 )
 
 func NewNativeBackend(writes bool, roots ...string) (*NativeBackend, error) {
-	root := filepath.Join(os.Getenv("LOCALAPPDATA"), "Monitors-Focus-Go-Dev")
+	root := profilePath(false)
 	if len(roots) > 0 {
 		root = roots[0]
 	}

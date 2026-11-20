@@ -17,11 +17,11 @@ public static class NativeMemoryWindow {
  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr h,StringBuilder text,int size);
- public static bool Visible(int processId) {bool found=false;EnumWindows((h,p)=>{uint id;GetWindowThreadProcessId(h,out id);if(id==processId&&IsWindowVisible(h)){var text=new StringBuilder(256);GetWindowText(h,text,256);var title=text.ToString();if(title=="MyScreen"||title=="Monitors Focus"){found=true;return false;}}return true;},IntPtr.Zero);return found;}
+ public static bool Visible(int processId) {bool found=false;EnumWindows((h,p)=>{uint id;GetWindowThreadProcessId(h,out id);if(id==processId&&IsWindowVisible(h)){var text=new StringBuilder(256);GetWindowText(h,text,256);var title=text.ToString();if(title=="MyScreen"){found=true;return false;}}return true;},IntPtr.Zero);return found;}
 }
 '@
 }
-$owner=@(Get-CimInstance Win32_Process -Filter "Name='MonitorsFocus.Go.exe'")
+$owner=@(Get-CimInstance Win32_Process -Filter "Name='MyScreen.exe'")
 if($owner.Count -ne 1){throw 'Need one product Go process'}
 $rootId=[int]$owner[0].ProcessId
 $wasOpen=[NativeMemoryWindow]::Visible($rootId)

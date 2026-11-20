@@ -41,7 +41,7 @@ func TestValidationNeverPassesAnUnperformedRequiredCheck(t *testing.T) {
 		t.Fatalf("unexpected results: %+v", records)
 	}
 	for _, r := range records {
-		if r.Schema != "monitorsfocus.desktop.validation.v1" || r.Time == "" {
+		if r.Schema != "myscreen.desktop.validation.v1" || r.Time == "" {
 			t.Fatal("missing JSONL schema/time")
 		}
 	}

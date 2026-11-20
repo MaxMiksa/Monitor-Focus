@@ -3,8 +3,8 @@ package main
 import (
 	"time"
 
-	"monitorsfocus/internal/desktop"
-	"monitorsfocus/internal/domain"
+	"myscreen/internal/desktop"
+	"myscreen/internal/domain"
 )
 
 // Called under the backend lock. A failed desktop read must not reuse cursor

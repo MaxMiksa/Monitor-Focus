@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"monitorsfocus/internal/audio"
+	"myscreen/internal/audio"
 	"testing"
 )
 

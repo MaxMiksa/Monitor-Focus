@@ -131,7 +131,7 @@ func (s *SilentSession) volume(percent *float64) (State, error) {
 			return State{}, ErrClosed
 		}
 		state, err := mix([]mixerSession{fixture.session}, percent, s.controller.guard)
-		state.Name, state.ProcessID = "MonitorsFocus native audio test", windows.GetCurrentProcessId()
+		state.Name, state.ProcessID = "MyScreen native audio test", windows.GetCurrentProcessId()
 		return state, err
 	})
 }

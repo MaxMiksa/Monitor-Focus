@@ -12,5 +12,5 @@ Docs: README.md (English default), README.zh-CN.md (Chinese); docs/PRODUCT.md (b
 - Gamma: preserve verified originals and newer external colors; reject HDR/uncertain identity. Compensation only for calibrated internal panels; separate normal/backlight targets and pair curves. Withdraw compensation before color restore/failure/exit. Never default personal calibration.
 - Revision conflicts preserve drafts. Back up migrations; failed read/migration/init must not change startup.
 - Disable/exit unhooks input; callbacks do no hardware work. Reuse lazy modifier feedback. Missing app audio uses throttled tray notices, never fabricated 0%. Ordinary edges use native OSD; brightness reports the internal panel.
-- Unique startup: MonitorsFocus.Go.exe --mode native --hardware --production --background. Exit retains latest normal brightness and restores color.
+- Unique startup: MyScreen.exe --mode native --hardware --production --background. Exit retains latest normal brightness and restores color.
 - docs/STATUS.md: feature status, future work (requires explicit user authorization), and only user-confirmed permanent exclusions. Keep three sections concise; no progress log. Tool paths and Go memory-overlay maintenance: docs/DEVELOPMENT.md.

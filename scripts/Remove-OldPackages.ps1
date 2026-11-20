@@ -4,9 +4,9 @@ if(-not (Test-Path -LiteralPath $packagesRoot)){return}
 $packagesRoot=(Resolve-Path -LiteralPath $packagesRoot).Path
 $packages=@(Get-ChildItem -LiteralPath $packagesRoot -Directory | Where-Object Name -Match '^\d{8}-\d{6}-\d{3}$' | Sort-Object Name -Descending)
 $obsolete=@($packages | Select-Object -Skip 5)
-$activePaths=@(Get-CimInstance Win32_Process -Filter "Name='MonitorsFocus.Go.exe'" | ForEach-Object ExecutablePath)
+$activePaths=@(Get-CimInstance Win32_Process -Filter "Name='MyScreen.exe' OR Name='MonitorsFocus.Go.exe' OR Name='MonitorsFocus.exe'" | ForEach-Object ExecutablePath)
 $startupKey=Get-ItemProperty 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Run'
-$startupCommand=[string]$startupKey.MonitorsFocus
+$startupCommand=@($startupKey.MyScreen,$startupKey.MonitorsFocus,$startupKey.'MonitorsFocus.ControlCenter') -join "`n"
 # Validate the entire deletion set before recycling anything.
 foreach($package in $obsolete){
     $target=(Resolve-Path -LiteralPath $package.FullName).Path

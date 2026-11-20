@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
-	"monitorsfocus/internal/audio"
-	"monitorsfocus/internal/desktop"
-	"monitorsfocus/internal/domain"
-	"monitorsfocus/internal/startup"
+	"myscreen/internal/audio"
+	"myscreen/internal/desktop"
+	"myscreen/internal/domain"
+	"myscreen/internal/startup"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -22,7 +22,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
-	"monitorsfocus/internal/win32"
+	"myscreen/internal/win32"
 )
 
 //go:embed all:frontend/dist
@@ -142,21 +142,13 @@ func main() {
 	if *command != "open" && *command != "close" && *command != "quit" {
 		log.Fatal("Unknown host command")
 	}
-	root := filepath.Join(os.Getenv("LOCALAPPDATA"), "Monitors-Focus-Go-Dev")
-	if *production {
-		root = filepath.Join(os.Getenv("LOCALAPPDATA"), "Monitors-Focus-Go")
+	if os.Getenv("LOCALAPPDATA") == "" {
+		log.Fatal("LOCALAPPDATA is not set")
 	}
-	if err := os.MkdirAll(root, 0700); err != nil {
-		log.Fatal(err)
-	}
-	file, err := os.OpenFile(filepath.Join(root, "host-"+*mode+".jsonl"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
+	root := profilePath(*production)
 	var backend *Backend
 	var ipc *ipcServer
-	host := &Host{mode: *mode, dev: *dev, logfile: file, inspect: *inspect != 0, production: *production}
+	host := &Host{mode: *mode, dev: *dev, inspect: *inspect != 0, production: *production}
 	appName := productName + " Dev"
 	if *production {
 		appName = productName
@@ -186,6 +178,7 @@ func main() {
 		Name: appName, Description: "Windows display controller",
 		Assets:  application.AssetOptions{Handler: handler, DisableLogging: true},
 		Windows: application.WindowsOptions{WndClass: trayWindowClass, DisableQuitOnLastWindowClosed: !*panelOnly, WebviewUserDataPath: filepath.Join(root, "WebView2", *mode), AdditionalBrowserArgs: browserArgs, WndProcInterceptor: fixedRatioInterceptor},
+		// Share the instance lock with older builds during upgrades.
 		SingleInstance: &application.SingleInstanceOptions{UniqueID: "MonitorsFocus.Go." + *mode, OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
 			action := "open"
 			for i, arg := range data.Args {
@@ -245,6 +238,20 @@ func main() {
 			host.app.Quit()
 			return
 		}
+		if err := prepareProfile(root, legacyProfilePath(*production)); err != nil {
+			log.Print(err)
+			host.app.Quit()
+			return
+		}
+		file, err := os.OpenFile(filepath.Join(root, "host-"+*mode+".jsonl"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+		if err != nil {
+			log.Print(err)
+			host.app.Quit()
+			return
+		}
+		host.mu.Lock()
+		host.logfile = file
+		host.mu.Unlock()
 		backend, err = NewBackend(*mode, *writes, root)
 		if err != nil {
 			host.record("startup-failed", map[string]any{"error": err.Error()})
@@ -299,14 +306,22 @@ func main() {
 			host.open()
 		}
 	})
-	if err = host.app.Run(); err != nil {
+	if err := host.app.Run(); err != nil {
 		log.Print(err)
 	}
+	host.mu.Lock()
+	if host.logfile != nil {
+		_ = host.logfile.Close()
+	}
+	host.mu.Unlock()
 }
 
 func (h *Host) record(event string, fields map[string]any) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if h.logfile == nil {
+		return
+	}
 	if fields == nil {
 		fields = map[string]any{}
 	}
@@ -344,7 +359,7 @@ func (h *Host) togglePanel() {
 		} else if h.panelReady {
 			h.record("window-shortcut-close-request", nil)
 			h.shortcutClosePending = true
-			w.ExecJS("window.dispatchEvent(new Event('monitor-focus-close-panel'))")
+			w.ExecJS("window.dispatchEvent(new Event('myscreen-close-panel'))")
 		} else {
 			w.Close()
 		}
@@ -532,7 +547,7 @@ func (h *Host) receive(w application.Window, message string, origin *application
 		data, _ := json.Marshal(reply)
 		// Shutdown hooks run on Wails' UI thread: never block the dispatcher on it.
 		application.InvokeAsync(func() {
-			w.ExecJS("window.dispatchEvent(new CustomEvent('monitor-focus-reply',{detail:" + string(data) + "}))")
+			w.ExecJS("window.dispatchEvent(new CustomEvent('myscreen-reply',{detail:" + string(data) + "}))")
 		})
 	}
 	if err := h.dispatch.enqueue(msg.Request, msg.Id, send); err != nil {
