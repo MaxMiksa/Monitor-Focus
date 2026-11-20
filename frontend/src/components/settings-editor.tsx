@@ -15,12 +15,12 @@ import type { WeatherSearchDraft } from '@/components/weather-settings'
 import { previewSky } from '@/lib/sky-preference'
 import type { StageKey } from '@/components/scene-panel'
 import { SortableList } from '@/components/sortable-list'
+import { ScheduleChart } from '@/components/schedule-chart'
 import { DisplayRow, Level } from './display-controls'
 import type { Send } from '@/App'
 import { captureBehavior, defaultWindowShortcut } from '@/lib/control'
 import type { Display, EdgeWheelModifier, Snapshot } from '@/lib/control'
 
-const ScheduleChart = lazy(() => import('./schedule-chart').then(module => ({ default: module.ScheduleChart })))
 const WeatherSettings = lazy(() => import('./weather-settings').then(module => ({ default: module.WeatherSettings })))
 const SkySettingsEditor = lazy(() => import('./sky-settings').then(module => ({ default: module.SkySettingsEditor })))
 

@@ -30,28 +30,30 @@ export function ScheduleChart({ settings, snapshot, onChange, active, location, 
   const points = resolved.points
 
   const display = snapshot.Displays.find(d => d.CanAdjustColor) ?? snapshot.Displays[0]
-  const valid = display && points.length && points.every(p => settings.Scenes.some(s => s.Id === p.SceneId))
+  const displayId = display?.Id
+  const canAdjustColor = display?.CanAdjustColor
+  const valid = !!displayId && points.length > 0 && points.every(p => settings.Scenes.some(s => s.Id === p.SceneId))
   const curves = useMemo(() => {
     const brightness: string[] = [], color: string[] = []
-    if (valid) for (let minute = 0; minute <= 1440; minute += 2) {
+    if (valid && displayId) for (let minute = 0; minute <= 1440; minute += 2) {
       const time = minute % 1440
       let index = points.findLastIndex(p => p.MinuteOfDay <= time)
       if (index < 0) index = points.length - 1
       const point = points[index], prior = points[(index + points.length - 1) % points.length]
-      const target = settings.Scenes.find(s => s.Id === point.SceneId)?.Targets[display.Id]
-      const from = settings.Scenes.find(s => s.Id === prior.SceneId)?.Targets[display.Id] ?? target
+      const target = settings.Scenes.find(s => s.Id === point.SceneId)?.Targets[displayId]
+      const from = settings.Scenes.find(s => s.Id === prior.SceneId)?.Targets[displayId] ?? target
       if (!target || !from) continue
       const elapsed = (time - point.MinuteOfDay + 1440) % 1440
       const progress = point.TransitionMinutes === 0 ? 1 : Math.min(1, elapsed / point.TransitionMinutes)
       const blend = progress * progress * (3 - 2 * progress)
       brightness.push(`${minute},${170 - (from.Brightness + (target.Brightness - from.Brightness) * blend) * 1.3}`)
-      if (display.CanAdjustColor) {
+      if (canAdjustColor) {
         const k = (from.Kelvin ?? 6500) + ((target.Kelvin ?? 6500) - (from.Kelvin ?? 6500)) * blend
         color.push(`${minute},${170 - (k - 2700) / 3800 * 130}`)
       }
     }
     return { brightness: brightness.join(' '), color: color.join(' ') }
-  }, [valid, points, settings.Scenes, display])
+  }, [valid, points, settings.Scenes, displayId, canAdjustColor])
   function minuteAt(clientX: number) {
     const rect = plot.current!.getBoundingClientRect()
     return Math.max(0, Math.min(1439, Math.round((clientX - rect.left) / rect.width * 1440)))
