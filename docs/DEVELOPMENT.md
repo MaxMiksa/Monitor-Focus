@@ -54,6 +54,7 @@ React/TypeScript → Wails 桥 → Go 宿主 / dispatcher
 
 ## 运行链路与安全边界
 
+- 面板仍按需创建、关闭即销毁。React 提交首页或连接错误后发出 `ui-ready`，宿主只亮出仍有效的窗口；不等待隐藏 WebView 的动画帧或场景素材。建窗时可取消，慢连接约 2 秒兜底。窗口、页面初始底色与舞台一致，不预开 WebView，也不缓存首屏截图。`runtime-ready` 是桥就绪，`panel-shown` 是原生窗口亮出，两者都不是背景图解码完成的时间。
 - Wails 前端消息先校验 `http://wails.localhost` 的 Origin/TopOrigin 一致性与消息大小，生产页面通过 CSP 禁止所有 frame；`Backend.Request` 再按动作白名单分发。`dispatcher` 串行处理，仅合并同一控件相邻的同方向调节，快照、保存和其他设备是屏障。桥不提供通用 Shell、文件系统或任意命令执行。
 - 本地命名管道只接受当前用户同一物理控制台会话的客户端；`host-memory` 分项诊断和显式 `host-memory-reclaim` 对照只从认证 IPC 进入，不在前端白名单。超时只让调用方继续，不取消仍在执行的硬件／COM 调用。
 - 每个 `win32.Worker` 把 DDC 句柄和 COM 引用固定在一个 OS 线程上；`Close` 必须排空队列、等待在途调用结束再释放。同类约束适用于音频 MTA 线程和桌面消息线程。低级钩子回调只做有界的命中判断和入队，硬件、音量与绘制在回调外完成；关闭或退出先撤销钩子，再关闭桌面、音频和显示器。

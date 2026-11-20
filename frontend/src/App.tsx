@@ -4,7 +4,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { MotionConfig } from 'motion/react'
 import { RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { isDesktop, preview, request, windowCommand } from '@/lib/control'
+import { isDesktop, preview, reportPanelReady, request, windowCommand } from '@/lib/control'
 import type { Request, Snapshot } from '@/lib/control'
 import type { SettingsEditorHandle } from '@/components/settings-editor'
 import { ScenePanel } from '@/components/scene-panel'
@@ -20,6 +20,12 @@ export default function App() {
   const demo = !isDesktop && new URLSearchParams(location.search).get('preview') === '1'
   const [snapshot, setSnapshot] = useState<Snapshot | null>(() => demo ? structuredClone(preview) : null)
   const [error, setError] = useState('')
+  const contentReady = snapshot !== null || error !== ''
+  useEffect(() => {
+    // Hidden WebViews can throttle animation frames. Signal after React commits
+    // the home or error view, without waiting for images, weather or effects.
+    if (isDesktop && contentReady) reportPanelReady()
+  }, [contentReady])
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editorStarted, setEditorStarted] = useState(false)
   const [initialCitySearch, setInitialCitySearch] = useState(false)
@@ -84,9 +90,10 @@ export default function App() {
   }, [send])
   useEffect(() => {
     if (demo || !isDesktop) return
-    const initial = setTimeout(() => void send({ Action: 'snapshot' }), 0)
+    let disposed = false
+    queueMicrotask(() => { if (!disposed) void send({ Action: 'snapshot' }) })
     const timer = setInterval(() => { if (!document.hidden && !busy.current) void send({ Action: 'snapshot' }) }, 2000)
-    return () => { clearTimeout(initial); clearInterval(timer) }
+    return () => { disposed = true; clearInterval(timer) }
   }, [send, demo])
   useEffect(() => {
     let closing = false
@@ -118,7 +125,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [settingsOpen, weatherOpen])
   return <MotionConfig reducedMotion="user"><SettingsMorph open={settingsOpen}><div className="scene-shell-root">
-    {!snapshot ? <div className="p-7"><h1>Monitors Focus</h1><p className="caption my-6">{message(error) || t('正在连接控制核心…')}</p><Button variant="outline" onClick={() => void send({ Action: 'snapshot' })}><RefreshCw />{t('重新连接')}</Button></div> : <ScenePanel snapshot={snapshot} send={sceneSend} error={error} demo={demo} settingsOpen={settingsOpen} weatherOpen={weatherOpen} setWeatherOpen={setWeatherOpen} openSettings={() => openEditor()} chooseWeatherLocation={() => openEditor(true)}>
+    {!snapshot ? <div className="p-7 text-white"><h1>Monitors Focus</h1><p className="my-6">{message(error) || t('正在连接控制核心…')}</p><Button variant="outline" className="text-foreground" onClick={() => void send({ Action: 'snapshot' })}><RefreshCw />{t('重新连接')}</Button></div> : <ScenePanel snapshot={snapshot} send={sceneSend} error={error} demo={demo} settingsOpen={settingsOpen} weatherOpen={weatherOpen} setWeatherOpen={setWeatherOpen} openSettings={() => openEditor()} chooseWeatherLocation={() => openEditor(true)}>
       <SettingsShell open={settingsOpen}><Suspense fallback={null}>{editorStarted && <SettingsEditor initialCitySearch={initialCitySearch} ref={editor} open={settingsOpen} close={() => setSettingsOpen(false)} snapshot={snapshot} send={send} />}</Suspense></SettingsShell>
     </ScenePanel>}
   </div></SettingsMorph></MotionConfig>

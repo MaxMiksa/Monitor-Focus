@@ -34,21 +34,19 @@ window.addEventListener('monitor-focus-reply', ((event: CustomEvent<Reply>) => {
   else if (data.Snapshot) task.resolve(data.Snapshot)
   else task.reject(new Error('控制核心未返回状态'))
 }) as EventListener)
-let readyReported = false
 export async function request(Request: Request): Promise<Snapshot> {
   if (!wailsRuntime) throw new Error('浏览器预览未连接桌面程序')
   const runtime = await wailsRuntime
   const Id = crypto.randomUUID()
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => { pending.delete(Id); reject(new Error('控制核心响应超时，请重试')) }, 12000)
-    pending.set(Id, { resolve: snapshot => {
-      resolve(snapshot)
-      if (!readyReported) {
-        readyReported = true
-        requestAnimationFrame(() => requestAnimationFrame(() => runtime.System.invoke(JSON.stringify({ Id: crypto.randomUUID(), Request: { Action: 'ui-ready' } }))))
-      }
-    }, reject, timer, started: performance.now(), action: Request.Action })
+    pending.set(Id, { resolve, reject, timer, started: performance.now(), action: Request.Action })
     runtime.System.invoke(JSON.stringify({ Id, Request }))
+  })
+}
+export function reportPanelReady() {
+  void wailsRuntime?.then(runtime => runtime.System.invoke(JSON.stringify({ Id: crypto.randomUUID(), Request: { Action: 'ui-ready' } }))).catch(() => {
+    // The host can show the connection screen even if the bridge failed.
   })
 }
 // The window keeps one fixed 16:9 aspect ratio on both pages; no resize request.

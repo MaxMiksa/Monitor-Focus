@@ -66,6 +66,9 @@ type Host struct {
 	opened               time.Time
 	serial               int
 	panelReady           bool
+	creatingPanel        bool
+	cancelPanelCreation  bool
+	panelRevealFallback  *time.Timer
 	shortcutClosePending bool
 	logfile              *os.File
 	dispatch             *dispatcher
@@ -315,7 +318,9 @@ func (h *Host) control(action string) {
 		h.open()
 	case "close":
 		application.InvokeSync(func() {
-			if h.window != nil {
+			if h.creatingPanel {
+				h.cancelPanelCreation = true
+			} else if h.window != nil {
 				h.window.Close()
 			}
 		})
@@ -325,6 +330,10 @@ func (h *Host) control(action string) {
 }
 func (h *Host) togglePanel() {
 	application.InvokeAsync(func() {
+		if h.creatingPanel {
+			h.cancelPanelCreation = !h.cancelPanelCreation
+			return
+		}
 		w := h.window
 		if w == nil || w.IsMinimised() {
 			h.record("window-shortcut-open", nil)
@@ -341,12 +350,18 @@ func (h *Host) togglePanel() {
 
 func (h *Host) open() {
 	application.InvokeSync(func() {
+		if h.creatingPanel {
+			h.cancelPanelCreation = false
+			return
+		}
 		if h.window != nil {
 			if h.window.IsMinimised() {
 				h.window.Restore()
 			}
-			h.window.Show()
-			h.window.Focus()
+			// Repeated open requests must not expose the hidden loading window.
+			if h.window.IsVisible() {
+				h.window.Focus()
+			}
 			return
 		}
 		h.opened = time.Now()
@@ -359,26 +374,29 @@ func (h *Host) open() {
 		if h.production {
 			title = "Monitors Focus"
 		}
-		w := h.app.Window.NewWithOptions(application.WebviewWindowOptions{Name: fmt.Sprintf("panel-%d", serial), Title: title, Width: panelClientWide, Height: panelClientHigh, URL: url, Frameless: true, DisableResize: false, DevToolsEnabled: h.dev || h.inspect, BackgroundColour: application.NewRGB(247, 249, 252), Windows: application.WindowsWindow{NonClientRegionSupport: true}})
+		// WebView2 pumps Windows messages while creating its controller.
+		h.creatingPanel = true
+		h.cancelPanelCreation = false
+		w := h.app.Window.NewWithOptions(application.WebviewWindowOptions{Name: fmt.Sprintf("panel-%d", serial), Title: title, Width: panelClientWide, Height: panelClientHigh, URL: url, Hidden: true, Frameless: true, DisableResize: false, DevToolsEnabled: h.dev || h.inspect, BackgroundColour: application.NewRGB(7, 21, 43), Windows: application.WindowsWindow{NonClientRegionSupport: true}})
+		h.creatingPanel = false
 		h.window = w
 		setFixedRatioWindow(uintptr(w.NativeWindow()))
-		w.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
-			clearFixedRatioWindow(uintptr(w.NativeWindow()))
-			if h.window == w {
-				h.window = nil
-			}
-			h.record("window-closed", map[string]any{"serial": serial})
+		w.RegisterHook(events.Common.WindowClosing, func(*application.WindowEvent) {
+			application.InvokeSync(func() {
+				clearFixedRatioWindow(uintptr(w.NativeWindow()))
+				if h.window == w {
+					h.stopPanelRevealFallback()
+					h.window = nil
+				}
+				h.record("window-closed", map[string]any{"serial": serial})
+			})
 		})
 		w.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
-			if err := setPanelIcon(uintptr(w.NativeWindow())); err != nil {
-				h.record("window-icon-error", map[string]any{"error": err.Error()})
-			}
-			applyFixedRatioSize(uintptr(w.NativeWindow()), panelClientWide, panelClientHigh)
-			// STARTUPINFO can hide the first ShowWindow when the tray process was
-			// launched with SW_HIDE. A later user open must explicitly show it.
-			w.Show()
-			w.Focus()
-			h.record("runtime-ready", map[string]any{"serial": serial, "elapsedMs": time.Since(h.opened).Milliseconds()})
+			application.InvokeAsync(func() {
+				if h.window == w {
+					h.record("runtime-ready", map[string]any{"serial": serial, "elapsedMs": time.Since(h.opened).Milliseconds()})
+				}
+			})
 		})
 		// Maximising and Windows snapping bypass WM_SIZING; return to the
 		// one-window 16:9 stage after those system transitions finish.
@@ -403,7 +421,48 @@ func (h *Host) open() {
 			})
 		})
 		h.record("window-created", map[string]any{"serial": serial})
+		if h.cancelPanelCreation {
+			w.Close()
+			return
+		}
+		h.panelRevealFallback = time.AfterFunc(2*time.Second, func() {
+			application.InvokeAsync(func() {
+				if h.window == w && !h.panelReady {
+					h.revealPanel(w)
+				}
+			})
+		})
 	})
+}
+
+func (h *Host) stopPanelRevealFallback() {
+	if h.panelRevealFallback != nil {
+		h.panelRevealFallback.Stop()
+		h.panelRevealFallback = nil
+	}
+}
+
+// Only called on the UI thread, for the current window.
+func (h *Host) revealPanel(w *application.WebviewWindow) {
+	h.stopPanelRevealFallback()
+	if w.IsVisible() {
+		return
+	}
+	hwnd := uintptr(w.NativeWindow())
+	if hwnd == 0 {
+		return
+	}
+	if err := setPanelIcon(hwnd); err != nil {
+		h.record("window-icon-error", map[string]any{"error": err.Error()})
+	}
+	applyFixedRatioSize(hwnd, panelClientWide, panelClientHigh)
+	// STARTUPINFO can override the first ShowWindow with SW_HIDE for a tray launch.
+	w.Show()
+	if !w.IsVisible() {
+		w.Show()
+	}
+	w.Focus()
+	h.record("panel-shown", map[string]any{"serial": h.serial, "elapsedMs": time.Since(h.opened).Milliseconds(), "uiReady": h.panelReady, "visible": w.IsVisible()})
 }
 
 func (h *Host) receive(w application.Window, message string, origin *application.OriginInfo) {
@@ -454,11 +513,12 @@ func (h *Host) receive(w application.Window, message string, origin *application
 		return
 	case "ui-ready":
 		application.InvokeAsync(func() {
-			if h.window == w {
+			if h.window == w && !h.panelReady {
 				h.panelReady = true
+				h.revealPanel(h.window)
+				h.record("ui-ready", map[string]any{"serial": h.serial, "elapsedMs": time.Since(h.opened).Milliseconds()})
 			}
 		})
-		h.record("ui-ready", map[string]any{"serial": h.serial, "elapsedMs": time.Since(h.opened).Milliseconds()})
 		return
 	case "ui-trace":
 		h.record("ui-complete", map[string]any{"traceId": msg.Id, "action": msg.Request.Id, "elapsedMs": msg.Request.Value})
