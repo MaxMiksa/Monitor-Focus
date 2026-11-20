@@ -66,7 +66,7 @@
 
 **配置、启动与边界**：原子保存留 `.bak`，Revision 冲突留草稿，坏文件／迁移／初始化失败不改写自启；支持中英与跟随系统；关闭面板释放 WebView2，退出卸载钩子、撤回补光、恢复原色并保留最新亮度。唯一自启 `MonitorsFocus.Go.exe --mode native --hardware --production --background`；桥校验 Origin／动作白名单，无通用执行或生产 Node／业务 HTTP 后端。
 
-**入口**：[README.md](../README.md)、[PRODUCT.md](PRODUCT.md)、[DEVELOPMENT.md](DEVELOPMENT.md)；当前部署证据 `build/diagnostics/general-readme-20261121-update.json`；包保留策略见 `scripts/Remove-OldPackages.ps1`。
+**入口**：[中文 README](../README.zh-CN.md) · [English README](../README.md) · [产品说明](PRODUCT.md) · [开发与构建](DEVELOPMENT.md)；当前部署证据 `build/diagnostics/myscreen-brand-20261121-update.json`；包保留策略见 `scripts/Remove-OldPackages.ps1`。
 
 ## 二、未来的待办记录
 

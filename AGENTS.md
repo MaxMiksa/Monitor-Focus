@@ -2,7 +2,7 @@
 
 Windows display controller: brightness/color, scenes, schedules, focus and edge scrolling. Go/Wails 3, React/TypeScript, WebView2. One workspace; sole local branch: main.
 
-Docs: README.md (Chinese entry); docs/PRODUCT.md (behavior/design), DEVELOPMENT.md (build/architecture), STATUS.md (verified/open items).
+Docs: README.md (English default), README.zh-CN.md (Chinese); docs/PRODUCT.md (behavior/design), DEVELOPMENT.md (build/architecture), STATUS.md (verified/open items).
 
 - Reply concisely in Chinese. Update docs before/after; retain current guidance only. Keep this file under 500 tokens. After each completed stage: minimal checks, deploy production, commit and push. Recycle obsolete/merged worktrees; retain five newest local packages after deployment, protecting running/startup paths.
 - Go sources at root; internal/{win32,audio,desktop,domain,startup}; frontend/ for UI; scripts/build.ps1 is the build entry. build/ holds generated output and the active package: check running/self-start paths before cleanup. No legacy stack or separate lab.

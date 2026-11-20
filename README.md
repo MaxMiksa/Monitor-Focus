@@ -1,65 +1,65 @@
-# MyScreen — Windows 屏幕控制
+# MyScreen — Screen Controls for Windows
 
-简体中文 · [English](README.en.md)
+English · [简体中文](README.zh-CN.md)
 
-在 Windows 上，让每块屏幕都舒服一点。用 `Win + W` 呼出面板，也可以不打开它，直接在屏幕边缘滚动鼠标。
+Adjust your displays on Windows. Press `Win + W` to open the panel, or use the mouse wheel at the edge of your screen without opening it.
 
-**轻量后台：常驻进程约 19 MB。** 这是本机任务管理器的一次实测，实际占用因环境而异。关掉面板会释放界面，边缘滚轮、定时渐变和专注仍可继续工作。
+**Lightweight tray app: about 19 MB of memory.** This is from one Task Manager reading; actual usage varies. Closing the panel frees its interface while edge scrolling, scheduled transitions, and Focus keep working.
 
-<h2 align="center">产品演示</h2>
+<h2 align="center">Product demo</h2>
 
 https://github.com/user-attachments/assets/321a01ba-bdf3-41b0-b84b-7249cf1c68eb
 
-1 分 37 秒 · 英文旁白 · [配乐与素材署名](docs/media/VIDEO-CREDITS.md)
+1 min 37 sec · English narration · [Video credits](docs/media/VIDEO-CREDITS.md)
 
-视频录制于更名前，片中使用原名 Monitors Focus。
+This video was recorded before the rename and uses the former name, Monitors Focus.
 
-以下为软件界面截图，显示器和天气数据用于演示。
+The screenshots show the app with sample display and weather data.
 
-<h2 align="center">通过滚轮快捷调节电脑声音和亮度</h2>
+<h2 align="center">Adjust volume and brightness with the mouse wheel</h2>
 
-在「通用」开启边缘滚轮。鼠标移到屏幕**顶部**滚动，调这块屏的亮度；移到**底部**滚动，调系统音量。按住默认的 **Alt** 再滚，顶部调屏幕冷暖，底部只调正在出声的前台应用（如果它支持单独调音量）。
+Enable edge scrolling under **General**. Scroll at the **top edge** to change that screen’s brightness, or at the **bottom edge** to change system volume. Hold **Alt** (the default modifier) to adjust color temperature at the top edge or the active app’s volume at the bottom, if that app supports separate volume control.
 
-![通用：左侧为外观与天气，右侧为窗口快捷键和边缘滚轮](docs/media/edge-controls.jpg)
+![General settings: appearance and weather on the left, shortcuts and edge scrolling on the right](docs/media/en/edge-controls.jpg)
 
-<h2 align="center">分别调节各屏的亮度和色温</h2>
+<h2 align="center">Adjust brightness and color temperature for each display</h2>
 
-在「当下」为笔记本和外接屏分别调亮度、色温。想让屏幕一起变亮或变暗，打开「亮度联动」，再拖其中一个亮度滑条就行。
+Under **Now**, adjust your laptop and external display separately. To make both brighter or dimmer together, turn on **Brightness linking** and move either brightness slider.
 
-![当下：两块屏幕各有亮度和色温滑条，下方可开启亮度联动](docs/media/display-controls.jpg)
+![Now tab: individual brightness and color temperature sliders for two displays](docs/media/en/display-controls.jpg)
 
-<h2 align="center">保存并快速切换显示场景</h2>
+<h2 align="center">Save and switch between display presets</h2>
 
-白天办公用偏亮的设置，晚上阅读换成柔和的暖色。在「场景」里为每块屏保存数值，也可以把当前搭配存成新场景。回到首页，点图标或按 `←` / `→` 就能切换。
+Use a brighter setup for daytime work and a warmer one for nighttime reading. Edit each display’s values in **Scenes**, or save your current setup as a new scene. From the home screen, click an icon or use `←` and `→` to switch.
 
-![场景：在同一页编辑早晨、中午、傍晚和夜间的双屏设置](docs/media/scenes.jpg)
+![Scenes tab: morning, midday, dusk, and night presets for two displays](docs/media/en/scenes.jpg)
 
-<h2 align="center">按时间自动调节亮度和色温</h2>
+<h2 align="center">Schedule changes to brightness and color temperature</h2>
 
-在「渐变」里拖动时间点，决定什么时候切到哪个场景，也能按日出、日落安排。设好渐变时长，亮度和色温就会慢慢过渡，不用一下子切换。
+In **Transitions**, drag a point to set when a scene starts, or schedule it around sunrise or sunset. Set a duration for brightness and color temperature to change gradually instead of all at once.
 
-![渐变：一天中各个场景的切换时间，以及亮度和色温的过渡曲线](docs/media/transitions.jpg)
+![Transitions tab: daily timeline with scene points and curves for brightness and color temperature](docs/media/en/transitions.jpg)
 
-<h2 align="center">离开副屏时自动遮黑</h2>
+<h2 align="center">Black out a second display when you leave it</h2>
 
-在「专注」里选好副屏和等待时间。鼠标离开后，黑色遮罩会盖住副屏；移回去就恢复，不改变显示器背光。看全屏视频时，也可以让副屏保持亮着。
+In **Focus**, choose a secondary display and set a delay. A black overlay covers that screen when the pointer leaves; moving it back restores the view without changing the backlight. You can also keep the display visible while watching a full-screen video.
 
-![专注：选择参与的副屏、变暗等待时间和全屏例外](docs/media/focus.jpg)
+![Focus tab: secondary display selection, delay, and full-screen exception](docs/media/en/focus.jpg)
 
-<h2 align="center">在首页查看天气和雨景</h2>
+<h2 align="center">See current weather and rain on the home screen</h2>
 
-首页的场景栏可以设成只显示一排图标。按 `↓` 看当前气温和出门建议；启用天气雨景后，只有当地正在下雨，画面才会跟着下雨。
+The home screen can show scenes as icons only. Press `↓` to check the current temperature and get advice before heading out. If weather effects are enabled, rain appears on the home screen when it’s raining in your selected location.
 
-![首页：傍晚雨景、图标式场景栏和天气卡片](docs/media/home-weather.jpg)
+![Home screen: rainy dusk scene with icon-only controls and an open weather card](docs/media/en/home-weather.jpg)
 
-<h2 align="center">按场景调整星星与云彩</h2>
+<h2 align="center">Customize the stars and clouds in each scene</h2>
 
-在「通用 → 星星与云彩」，可以分别给四个场景调星星的亮度、闪烁，或云彩的浓淡、飘动速度。这些只改变首页画面。
+In **General → Stars and clouds**, adjust how bright the stars are and how much they twinkle, or change the density and speed of the clouds. Each scene remembers its own settings, and these effects only change the home screen.
 
-![星星与云彩：在夜晚预览中分别调整两类效果](docs/media/sky-settings.jpg)
+![Stars and clouds settings: separate controls and a night scene preview](docs/media/en/sky-settings.jpg)
 
-<h2 align="center">安装和启动</h2>
+<h2 align="center">Install and launch</h2>
 
-- 需要 Windows 10/11 x64 和 Microsoft Edge WebView2 Runtime。外接屏的亮度调节需要显示器支持并启用 DDC/CI；色温调节适用于兼容的 SDR 屏幕。
-- 当前 Go 版从源码构建。执行 `./scripts/build.ps1 -Check -Package`，然后运行生成的 `MonitorsFocus.Go.exe`。首次打开后，可在「通用」开启登录自启。GitHub 上的历史发布包不代表当前版本。
-- [产品说明](docs/PRODUCT.md) · [开发与更新](docs/DEVELOPMENT.md) · [验证状态](docs/STATUS.md) · [许可证](LICENSE)
+- Requires Windows 10/11 x64 and Microsoft Edge WebView2 Runtime. External-display brightness control requires DDC/CI support and must be enabled on the monitor. Color temperature control requires a compatible SDR display.
+- Build the current Go version from source: run `./scripts/build.ps1 -Check -Package`, then launch the generated `MonitorsFocus.Go.exe`. You can enable launch on sign-in under **General**. Older GitHub releases do not reflect the current Go version.
+- [Product guide (Chinese)](docs/PRODUCT.md) · [Build and update notes (Chinese)](docs/DEVELOPMENT.md) · [Project status (Chinese)](docs/STATUS.md) · [License](LICENSE)
