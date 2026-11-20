@@ -50,7 +50,7 @@
 
 **云彩分布**：按用户反馈撤下本轮写实／卡通候选与首页临时测试栏，恢复先前三种组件云彩；仅为这三款增加可选位置算法，旧版薄云与星星保持不变。五种分布切换、保存重开、撤销与旧版隔离通过；60组位置组合验证确定性／有界／有限，浏览器无错误。lint／前端构建／隔离正式构建通过，单次原生关闭后无WebView2残留；未做长期资源／硬件回归。
 
-**总体与交付**：单工作区、唯一 `main`；Go/Wails 3 核心、React/TypeScript 按需面板。2026-11-17 当前正式包 `build/packages/20261117-130944-600/`，包含当前窗口／字号、天气雨景、星星／云彩、云彩位置分布、逐星闪烁、设置页连续形变、可中断场景过渡、快速输入修正与天空按需资源、斜风雨及外框溅落、界面资源懒加载与释放、首页天气卡片及统一背景切换／双机器水花、渐变交互图、点击外部收起、两种云彩移动方式、日出／日落节点与可选蒲公英随风漂浮；唯一核心与自启指向该包，亮度／色温与专注状态保留，Error／Warning 为空。正式构建基于当前已提交原生源码，未夹带原型页修改。验证包括 lint、TypeScript／前端构建、Go 正式编译与 PE 检查、天空设置与天气基础路径、可中断过渡的逐像素检查、设置页逐帧形变与中途反向检查、同帧连续输入与中间回报检查；未做完整硬件回归。阶段交付为最小验证→正式部署→提交／推送，本地保留最近 5 个包。
+**总体与交付**：当前本机正式包 `build/packages/20261121-002126-038/`，唯一核心与登录自启指向该包；亮度、色温及专注状态保留，无错误或警告。通用页按外观／天气和启动／输入分列，正式资源验证了中文布局、1024×576 英文窗口的城市搜索及天空设置返回。正式构建、lint、Go 测试／vet 与 PE 检查通过；未做全量硬件回归。本地保留最近 5 个包。
 
 **显示与颜色**：逐屏 DDC/CI／WMI 亮度、SDR Gamma 色温、原色恢复、颜色 journal、亮度联动及设备对曲线已实现；写入串行且读回，只控制身份明确的物理控制台实体屏，HDR／身份不明拒绝调色，外部新颜色停写提示。Go 验收覆盖双屏亮度／Gamma 读写恢复、外部颜色保护、串行排空。内屏暖色补光有规则，本机未校准、未启用；暖色跨屏等亮、偏绿修正、全范围恒亮未验收，界面未完整区分目标／写入中／硬件读回。
 
@@ -64,7 +64,7 @@
 
 **配置、启动与边界**：原子保存留 `.bak`，Revision 冲突留草稿，坏文件／迁移／初始化失败不改写自启；支持中英与跟随系统；关闭面板释放 WebView2，退出卸载钩子、撤回补光、恢复原色并保留最新亮度。唯一自启 `MonitorsFocus.Go.exe --mode native --hardware --production --background`；桥校验 Origin／动作白名单，无通用执行或生产 Node／业务 HTTP 后端。
 
-**入口**：[README.md](../README.md)、[PRODUCT.md](PRODUCT.md)、[DEVELOPMENT.md](DEVELOPMENT.md)；当前部署证据 `build/diagnostics/seed-wind-20261117-update.json`，输入验收证据见 `build/diagnostics/scene-input-fix/`，GPU 与构建证据见 `build/diagnostics/scene-interrupt/`；包保留策略见 `scripts/Remove-OldPackages.ps1`。
+**入口**：[README.md](../README.md)、[PRODUCT.md](PRODUCT.md)、[DEVELOPMENT.md](DEVELOPMENT.md)；当前部署证据 `build/diagnostics/general-readme-20261121-update.json`；包保留策略见 `scripts/Remove-OldPackages.ps1`。
 
 ## 二、未来的待办记录
 

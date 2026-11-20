@@ -152,7 +152,7 @@ html:has(.scene-shell-root), .scene-shell-root { background: #07152b; }
 .settings-float [data-slot=switch][data-state=checked] { background: #fff0d2; }
 .settings-float [data-slot=switch-thumb] { width: 17px; height: 17px; background: #fff9eb; }
 .settings-float [data-slot=switch-thumb][data-state=checked] { transform: translateX(15px); background: #9a8069; }
-.settings-float .settings-page-general { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 0 44px; align-content: center; padding-bottom: 24px; }
+.settings-float .settings-page-general { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 0 44px; align-content: safe center; padding-bottom: 24px; }
 .scene-shell[data-background=classic] .sky-effects-canvas { mask-image: url('/scenes/sky-mask.svg'); }
 .sky-effects-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; mask-image: url('/scenes/live/sky-mask.png'); mask-size: cover; mask-position: center; mask-repeat: no-repeat; }
 .settings-float .settings-editing-sky { display: block; padding-top: 16px; padding-bottom: 8px; }

@@ -120,6 +120,7 @@ export function SettingsEditor({ initialCitySearch, open, close, snapshot, send,
       <div className="form-row"><label htmlFor="scene-bar-style">{t('场景栏样式')}</label><Select id="scene-bar-style" value={barStyle} onValueChange={value => change(s => { s.appearance.bar = value === 'icon' ? 'icon' : value === 'both' ? 'both' : 'text' })} options={[{ value: 'text', label: t('仅文字') }, { value: 'icon', label: t('仅图标') }, { value: 'both', label: t('文字与图标') }]} /></div>
       <div className="form-row"><span>{t('天空效果')}</span><Button variant="outline" onClick={() => setSkyOpen(true)}>{t('星星与云彩')}</Button></div>
       <div className="form-row"><label htmlFor="language">{t('语言')}</label><Select id="language" value={draft.Language ?? 'system'} onValueChange={value => { const language = value as Language; change(s => { s.Language = language }); setLanguage(language) }} options={[{ value: 'system', label: t('跟随系统') }, { value: 'zh-CN', label: '简体中文' }, { value: 'en', label: 'English' }]} /></div>
+      <WeatherSettings active={open} searchDraft={weatherSearch} onSearchDraftChange={setWeatherSearch} value={draft.appearance.weather} onChange={weather => change(s => { s.appearance.weather = weather; if (weather.city) s.SolarLocation = { Name: weather.city.name, Latitude: weather.city.latitude, Longitude: weather.city.longitude } })} />
       </div>
       <div className="settings-function-group">
       <div className="form-row"><label htmlFor="startup">{t('登录后自动启动')}</label><Switch id="startup" checked={draft.LaunchOnStartup} onCheckedChange={on => change(s => { s.LaunchOnStartup = on })} /></div>
@@ -134,7 +135,6 @@ export function SettingsEditor({ initialCitySearch, open, close, snapshot, send,
       <div className="form-row"><label htmlFor="edge-brightness">{t('顶部滚轮调节亮度')}</label><Switch id="edge-brightness" checked={draft.TopEdgeBrightnessEnabled ?? false} onCheckedChange={on => change(s => { s.TopEdgeBrightnessEnabled = on })} /></div>
       <div className="form-row"><label htmlFor="edge-volume">{t('底部滚轮调节音量')}</label><Switch id="edge-volume" checked={draft.BottomEdgeVolumeEnabled ?? false} onCheckedChange={on => change(s => { s.BottomEdgeVolumeEnabled = on })} /></div>
       <div className="form-row"><label htmlFor="edge-modifier">{t('色温／应用音量按键')}</label><Select id="edge-modifier" value={draft.EdgeWheelModifier ?? 'alt'} onValueChange={value => change(s => { s.EdgeWheelModifier = value as EdgeWheelModifier })} options={[{ value: 'alt', label: 'Alt' }, { value: 'ctrl', label: 'Ctrl' }, { value: 'shift', label: 'Shift' }]} /></div>
-      <WeatherSettings active={open} searchDraft={weatherSearch} onSearchDraftChange={setWeatherSearch} value={draft.appearance.weather} onChange={weather => change(s => { s.appearance.weather = weather; if (weather.city) s.SolarLocation = { Name: weather.city.name, Latitude: weather.city.latitude, Longitude: weather.city.longitude } })} />
       </div>
     </>}
     </div></Suspense>
