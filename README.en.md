@@ -6,6 +6,12 @@ Adjust your displays on Windows. Press `Win + W` to open the panel, or use the m
 
 **Lightweight tray app: about 19 MB of memory.** This is from one Task Manager reading; actual usage varies. Closing the panel frees its interface while edge scrolling, scheduled transitions, and Focus keep working.
 
+<h2 align="center">Product demo</h2>
+
+https://github.com/user-attachments/assets/321a01ba-bdf3-41b0-b84b-7249cf1c68eb
+
+1 min 37 sec · English narration · [Video credits](docs/media/VIDEO-CREDITS.md)
+
 The screenshots show the app with sample display and weather data.
 
 <h2 align="center">Adjust volume and brightness with the mouse wheel</h2>

@@ -6,6 +6,12 @@
 
 **轻量后台：常驻进程约 19 MB。** 这是本机任务管理器的一次实测，实际占用因环境而异。关掉面板会释放界面，边缘滚轮、定时渐变和专注仍可继续工作。
 
+<h2 align="center">产品演示</h2>
+
+https://github.com/user-attachments/assets/321a01ba-bdf3-41b0-b84b-7249cf1c68eb
+
+1 分 37 秒 · 英文旁白 · [配乐与素材署名](docs/media/VIDEO-CREDITS.md)
+
 以下为软件界面截图，显示器和天气数据用于演示。
 
 <h2 align="center">通过滚轮快捷调节电脑声音和亮度</h2>
