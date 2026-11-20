@@ -36,7 +36,7 @@
 
 ## 定位与范围
 
-Monitors Focus 是面向个人使用、兼顾开源分享的 Windows 显示器控制中心。Go 常驻核心负责硬件、计划、专注和边缘滚轮；React 面板按需打开，关闭后核心继续运行，不保留自有 WebView2 界面进程。
+MyScreen 是面向个人使用、兼顾开源分享的 Windows 显示器控制工具。Go 常驻核心负责硬件、计划、专注和边缘滚轮；React 面板按需打开，关闭后核心继续运行，不保留自有 WebView2 界面进程。
 
 - 支持 Windows 10/11 x64 与 Microsoft Edge WebView2 Runtime。
 - 主要真机环境是一块 AOC U27G4 外接屏和一块 BOE 笔记本内屏；外接屏用 DDC/CI，内屏用 WMI 调背光。
@@ -140,7 +140,7 @@ Monitors Focus 是面向个人使用、兼顾开源分享的 Windows 显示器�
 ## 语言、启动与退出
 
 - 支持简体中文、English 和跟随系统；切换语言立即预览但不重建草稿，自动保存后用于后续启动。中文系统语言（含繁体）使用简体中文，其他语言回退 English。用户改名的场景保持原样，默认场景名称可随语言变化；前端偏好在加载首屏时读取，保存后用于后续启动。当前托盘菜单固定使用中文。
-- 登录自启只保留 `HKCU` 下唯一 `MonitorsFocus` 项，命令指向正式包中的 `MonitorsFocus.Go.exe --mode native --hardware --production --background`。配置读取、迁移或核心初始化失败时不改动已有自启项。
+- MyScreen 是显示名称，沿用原有程序文件名、配置与自启标识。登录自启只保留 `HKCU` 下唯一 `MonitorsFocus` 项，命令指向正式包中的 `MonitorsFocus.Go.exe --mode native --hardware --production --background`。配置读取、迁移或核心初始化失败时不改动已有自启项。
 - 打开面板时按需创建窗口，首页或连接错误可显示后再亮出；连接慢时会显示深色连接页，不闪白。关闭面板销毁 WebView2，不在托盘预开窗口。正式构建无参数打开面板，`--background` 只启动托盘。正常退出移除遮罩、卸载滚轮钩子、撤回补光并恢复原色，保留最新正常亮度。
 
 ## 设置保存与失败恢复

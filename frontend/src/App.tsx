@@ -125,7 +125,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [settingsOpen, weatherOpen])
   return <MotionConfig reducedMotion="user"><SettingsMorph open={settingsOpen}><div className="scene-shell-root">
-    {!snapshot ? <div className="p-7 text-white"><h1>Monitors Focus</h1><p className="my-6">{message(error) || t('正在连接控制核心…')}</p><Button variant="outline" className="text-foreground" onClick={() => void send({ Action: 'snapshot' })}><RefreshCw />{t('重新连接')}</Button></div> : <ScenePanel snapshot={snapshot} send={sceneSend} error={error} demo={demo} settingsOpen={settingsOpen} weatherOpen={weatherOpen} setWeatherOpen={setWeatherOpen} openSettings={() => openEditor()} chooseWeatherLocation={() => openEditor(true)}>
+    {!snapshot ? <div className="p-7 text-white"><h1>MyScreen</h1><p className="my-6">{message(error) || t('正在连接控制核心…')}</p><Button variant="outline" className="text-foreground" onClick={() => void send({ Action: 'snapshot' })}><RefreshCw />{t('重新连接')}</Button></div> : <ScenePanel snapshot={snapshot} send={sceneSend} error={error} demo={demo} settingsOpen={settingsOpen} weatherOpen={weatherOpen} setWeatherOpen={setWeatherOpen} openSettings={() => openEditor()} chooseWeatherLocation={() => openEditor(true)}>
       <SettingsShell open={settingsOpen}><Suspense fallback={null}>{editorStarted && <SettingsEditor initialCitySearch={initialCitySearch} ref={editor} open={settingsOpen} close={() => setSettingsOpen(false)} snapshot={snapshot} send={send} />}</Suspense></SettingsShell>
     </ScenePanel>}
   </div></SettingsMorph></MotionConfig>

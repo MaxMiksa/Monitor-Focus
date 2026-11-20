@@ -1,4 +1,4 @@
-# Monitors Focus
+# MyScreen — Windows 屏幕控制
 
 简体中文 · [English](README.en.md)
 
@@ -11,6 +11,8 @@
 https://github.com/user-attachments/assets/321a01ba-bdf3-41b0-b84b-7249cf1c68eb
 
 1 分 37 秒 · 英文旁白 · [配乐与素材署名](docs/media/VIDEO-CREDITS.md)
+
+视频录制于更名前，片中使用原名 Monitors Focus。
 
 以下为软件界面截图，显示器和天气数据用于演示。
 

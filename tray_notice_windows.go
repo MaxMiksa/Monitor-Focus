@@ -28,7 +28,7 @@ func showTrayWarning(message string) error {
 		}
 		data := w32.NOTIFYICONDATA{HWnd: w32.HWND(hwnd), UID: 1, UFlags: w32.NIF_INFO, UVersion: 3000, DwInfoFlags: w32.NIIF_WARNING | 0x10}
 		data.CbSize = uint32(unsafe.Sizeof(data))
-		title, _ := windows.UTF16FromString("Monitors Focus")
+		title, _ := windows.UTF16FromString(productName)
 		body, _ := windows.UTF16FromString(message)
 		copy(data.SzInfoTitle[:], title)
 		copy(data.SzInfo[:], body)
@@ -36,5 +36,5 @@ func showTrayWarning(message string) error {
 			return nil
 		}
 	}
-	return errors.New("existing Monitors Focus tray icon was not available for notification")
+	return errors.New("existing " + productName + " tray icon was not available for notification")
 }

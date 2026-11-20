@@ -1,4 +1,4 @@
-# Monitors Focus
+# MyScreen — Screen Controls for Windows
 
 [简体中文](README.md) · English
 
@@ -11,6 +11,8 @@ Adjust your displays on Windows. Press `Win + W` to open the panel, or use the m
 https://github.com/user-attachments/assets/321a01ba-bdf3-41b0-b84b-7249cf1c68eb
 
 1 min 37 sec · English narration · [Video credits](docs/media/VIDEO-CREDITS.md)
+
+This video was recorded before the rename and uses the former name, Monitors Focus.
 
 The screenshots show the app with sample display and weather data.
 

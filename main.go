@@ -37,6 +37,8 @@ var whiteIcon []byte
 // Set only by the adopted product build. Validation builds remain explicit mock.
 var adoptedBuild string
 
+const productName = "MyScreen"
+
 type Request struct {
 	SolarLocation *domain.SolarLocation `json:",omitempty"`
 	Action        string
@@ -155,9 +157,9 @@ func main() {
 	var backend *Backend
 	var ipc *ipcServer
 	host := &Host{mode: *mode, dev: *dev, logfile: file, inspect: *inspect != 0, production: *production}
-	appName := "Monitors Focus Dev"
+	appName := productName + " Dev"
 	if *production {
-		appName = "Monitors Focus"
+		appName = productName
 	}
 	browserArgs := []string{}
 	if *inspect != 0 {
@@ -215,10 +217,11 @@ func main() {
 	host.app.SetIcon(icon)
 	if !*panelOnly {
 		tray := host.app.SystemTray.New().SetIcon(nativeTrayIcon())
+		tray.SetTooltip(appName)
 		menu := host.app.NewMenu()
 		openLabel, closeLabel, exitLabel := "打开实验面板 · "+*mode, "关闭实验面板", "退出实验（保留现用程序）"
 		if *production {
-			openLabel, closeLabel, exitLabel = "打开 Monitors Focus", "关闭面板", "退出 Monitors Focus"
+			openLabel, closeLabel, exitLabel = "打开 "+productName, "关闭面板", "退出 "+productName
 		}
 		menu.Add(openLabel).OnClick(func(*application.Context) { host.open() })
 		menu.Add(closeLabel).OnClick(func(*application.Context) { host.control("close") })
@@ -370,9 +373,9 @@ func (h *Host) open() {
 		h.serial++
 		serial := h.serial
 		url := "/?language=zh-CN"
-		title := "Monitors Focus · Dev · " + h.mode
+		title := productName + " · Dev · " + h.mode
 		if h.production {
-			title = "Monitors Focus"
+			title = productName
 		}
 		// WebView2 pumps Windows messages while creating its controller.
 		h.creatingPanel = true
