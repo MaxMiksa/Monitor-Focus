@@ -38,12 +38,14 @@ React/TypeScript → Wails 桥 → Go 宿主 / dispatcher
 ```powershell
 ./scripts/build.ps1 -Check
 ./scripts/build.ps1 -Check -Package
+./scripts/Package-Portable.ps1 -Version v3.0.0
 ./scripts/Dev.ps1
 ./scripts/Update-NativeGo.ps1 -Executable <包exe>
 ./scripts/Measure-NativeMemory.ps1 -Label <唯一标签>
 ```
 
 - `scripts/build.ps1` 是唯一正式构建入口：冻结安装前端、构建内嵌资源、下载锁定 Go 依赖；`-Check` 追加前端 lint、Go test 与 vet，最终校验 PE 可写段后生成 `build/MyScreen.exe`。`-Package` 另外复制到 `build/packages/时间戳/MyScreen.exe`，时间戳由脚本生成，不在文档写死。构建不部署、不提交、不发布；若正在运行 `build/MyScreen.exe`，须先正常退出再构建；从 `build/packages/` 运行的独立包可继续使用。
+- 公开发布先运行 `build.ps1 -Check`，再运行 `Package-Portable.ps1 -Version <vX.Y.Z>`。脚本把正式 x64 exe 和许可证放进 `build/releases/<vX.Y.Z>/MyScreen-windows-x64.zip`。从 ZIP 解压验收后，再将它挂到同一源码提交的 GitHub Release；文件名保持不变，供 README 的「最新版」直链使用。
 - `scripts/Dev.ps1` 启动本地 Vite，并以独立 mock 模式打开 `build/MyScreen.exe`；不写硬件、不修改登录自启。启动前完成正式构建；浏览器预览带明确示例数据标识，不能把示例成功当作硬件成功。
 - `scripts/Update-NativeGo.ps1 -Executable <包exe>` 读取当前快照，通过认证 IPC 正常退出旧核心，启动新包、等待硬件就绪并恢复目标／专注状态，核对唯一自启项；失败时先排空新核心再尝试独占回退。只传稳定的包路径，不覆盖运行中的 exe；更新结果写入 `build/diagnostics/`。
 - `scripts/Measure-NativeMemory.ps1 -Label <唯一标签>` 对当前唯一 Go 核心做五轮面板开关，统计全部自有进程、Private Bytes、专用工作集、CPU 和可见窗口耗时，结果写入 `build/diagnostics/`。标签须唯一；可见窗口不等于渲染完成或可操作时间。

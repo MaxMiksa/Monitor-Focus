@@ -4,6 +4,8 @@
 
 **让你的屏幕跟上你的节奏。**
 
+**[下载 Windows x64 免安装版（ZIP）][download-zip]**
+
 在 Windows 上，让每块屏幕都舒服一点。用 `Win + W` 呼出面板，也可以不打开它，直接在屏幕边缘滚动鼠标。
 
 **轻量后台：常驻进程约 19 MB。** 这是本机任务管理器的一次实测，实际占用因环境而异。关掉面板会释放界面，边缘滚轮、定时渐变和专注仍可继续工作。
@@ -60,6 +62,13 @@ https://github.com/user-attachments/assets/46796fce-cb31-4fc6-9784-16fe55aac08f
 
 <h2 align="center">安装和启动</h2>
 
-- 需要 Windows 10/11 x64 和 Microsoft Edge WebView2 Runtime。外接屏的亮度调节需要显示器支持并启用 DDC/CI；色温调节适用于兼容的 SDR 屏幕。
-- 当前 Go 版从源码构建。执行 `./scripts/build.ps1 -Check -Package`，然后运行生成的 `MyScreen.exe`。首次打开后，可在「通用」开启登录自启。GitHub 上的历史发布包不代表当前版本。
-- [产品说明](docs/PRODUCT.md) · [开发与更新](docs/DEVELOPMENT.md) · [验证状态](docs/STATUS.md) · [许可证](LICENSE)
+1. [下载免安装 ZIP][download-zip]，解压到一个准备长期保留的文件夹。
+2. 双击 `MyScreen.exe`，不用安装。按 `Win + W` 可以呼出面板，也可以在「通用」开启登录自启。
+
+需要 Windows 10/11 x64 和 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download)。外接屏调亮度需要开启显示器的 DDC/CI；色温调节适用于兼容的 SDR 屏幕。
+
+从 v2.0.0 或更早版本升级时，请先关闭旧版的登录自启并从托盘退出，再运行 MyScreen。旧版设置不会自动导入。
+
+[产品说明](docs/PRODUCT.md) · [从源码构建](docs/DEVELOPMENT.md) · [验证状态](docs/STATUS.md) · [许可证](LICENSE)
+
+[download-zip]: https://github.com/MaxMiksa/MyScreen/releases/latest/download/MyScreen-windows-x64.zip

@@ -4,6 +4,8 @@ English · [简体中文](README.zh-CN.md)
 
 **Let your screens keep pace with you.**
 
+**[Download for Windows x64 (portable ZIP)][download-zip]**
+
 Adjust your displays on Windows. Press `Win + W` to open the panel, or use the mouse wheel at the edge of your screen without opening it.
 
 **Lightweight tray app: about 19 MB of memory.** This is from one Task Manager reading; actual usage varies. Closing the panel frees its interface while edge scrolling, scheduled transitions, and Focus keep working.
@@ -60,6 +62,13 @@ In **General → Stars and clouds**, adjust how bright the stars are and how muc
 
 <h2 align="center">Install and launch</h2>
 
-- Requires Windows 10/11 x64 and Microsoft Edge WebView2 Runtime. External-display brightness control requires DDC/CI support and must be enabled on the monitor. Color temperature control requires a compatible SDR display.
-- Build the current Go version from source: run `./scripts/build.ps1 -Check -Package`, then launch the generated `MyScreen.exe`. You can enable launch on sign-in under **General**. Older GitHub releases do not reflect the current Go version.
-- [Product guide (Chinese)](docs/PRODUCT.md) · [Build and update notes (Chinese)](docs/DEVELOPMENT.md) · [Project status (Chinese)](docs/STATUS.md) · [License](LICENSE)
+1. [Download the portable ZIP][download-zip] and extract it to a folder you plan to keep.
+2. Double-click `MyScreen.exe`. No installer is needed. Press `Win + W` to open the panel and use **General** to enable launch on sign-in.
+
+Requires Windows 10/11 x64 and the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download). External-display brightness requires DDC/CI to be enabled on the monitor. Color temperature control requires a compatible SDR display.
+
+Upgrading from v2.0.0 or earlier? Disable the old app's launch-on-sign-in setting and exit it from the tray before starting MyScreen. Settings from those releases are not imported automatically.
+
+[Product guide (Chinese)](docs/PRODUCT.md) · [Build from source (Chinese)](docs/DEVELOPMENT.md) · [Project status (Chinese)](docs/STATUS.md) · [License](LICENSE)
+
+[download-zip]: https://github.com/MaxMiksa/MyScreen/releases/latest/download/MyScreen-windows-x64.zip

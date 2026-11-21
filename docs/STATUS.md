@@ -2,7 +2,7 @@
 
 ## 一、当前项目各功能的完成状态
 
-**更名**：GitHub 仓库、窗口、托盘、程序文件和中英文 README 统一为 MyScreen。本机已验证设置文件内容不变、显示目标与专注状态保留、仅有新自启项。旧配置留作回退。
+**公开下载**：[MyScreen Windows x64 免安装版](https://github.com/MaxMiksa/MyScreen/releases/latest)包含程序和许可证，不包含 WebView2。正式构建与检查通过；从 ZIP 解压部署并验证面板、原有计划与专注、唯一自启均正常。旧 Go 配置留作回退。
 
 **窗口快捷键**已部署至 `20261118-145620-787`。在 Windows 桌面模拟两种松键顺序，`Win + W` 均可开关窗口且不弹出开始菜单，单按 `Win` 仍可打开开始菜单。自定义组合、长按与禁用见 `build/diagnostics/window-shortcut-20261118-input.json`。本次桌面验收及部署见 `build/diagnostics/window-shortcut-start-20261118-*`。
 
@@ -66,7 +66,7 @@
 
 **配置、启动与边界**：原子保存留 `.bak`，Revision 冲突留草稿，坏文件／迁移／初始化失败不改写自启；支持中英与跟随系统；关闭面板释放 WebView2，退出卸载钩子、撤回补光、恢复原色并保留最新亮度。唯一自启 `MyScreen.exe --mode native --hardware --production --background`；桥校验 Origin／动作白名单，无通用执行或生产 Node／业务 HTTP 后端。
 
-**入口**：[中文 README](../README.zh-CN.md) · [English README](../README.md) · [产品说明](PRODUCT.md) · [开发与构建](DEVELOPMENT.md)；当前部署证据 `build/diagnostics/myscreen-brand-20261121-update.json`；包保留策略见 `scripts/Remove-OldPackages.ps1`。
+**入口**：[中文 README](../README.zh-CN.md) · [English README](../README.md) · [产品说明](PRODUCT.md) · [开发与构建](DEVELOPMENT.md)；当前部署证据 `build/diagnostics/v3-portable-update.json`；包保留策略见 `scripts/Remove-OldPackages.ps1`。
 
 ## 二、未来的待办记录
 
